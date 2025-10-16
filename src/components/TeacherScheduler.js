@@ -28,6 +28,11 @@ import {
   CheckboxGroup,
   Badge,
   GridItem,
+  Select,
+  Tag,
+  TagLabel,
+  Wrap,
+  WrapItem,
 } from '@chakra-ui/react';
 import { ArrowBackIcon, CheckIcon, CloseIcon, SearchIcon, CalendarIcon } from '@chakra-ui/icons';
 import { useNavigate } from 'react-router-dom';
@@ -38,6 +43,8 @@ const TeacherScheduler = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [roomNumber, setRoomNumber] = useState('');
   const [blocks, setBlocks] = useState([]);
+  const [subject, setSubject] = useState('');
+  const [schoolLevel, setSchoolLevel] = useState('');
   const [notes, setNotes] = useState('');
   const [selectedSubs, setSelectedSubs] = useState([]);
   const [emailPreview, setEmailPreview] = useState('');
@@ -45,6 +52,7 @@ const TeacherScheduler = () => {
   const [substitutes, setSubstitutes] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredSubstitutes, setFilteredSubstitutes] = useState([]);
+
   const navigate = useNavigate();
   const { user } = useAuth();
   const toast = useToast();
@@ -55,14 +63,36 @@ const TeacherScheduler = () => {
   const bgColor = 'rgb(30, 64, 110)';
   const inputBg = '#FFFFFF';
 
-  const periods = [
-    '1st Period: 8:19am-9:14am',
-    '2nd Period: 9:52am-11:02am',
-    '3rd Period (flex): 11:06am-12:26pm',
-    '3rd Period (no flex): 11:31am-12:26pm',
-    '4th Period: 1:02pm-1:47pm',
-    '5th Period: 1:51pm-2:46pm',
+  const subjects = [
+    'History',
+    'Art',
+    'World Languages',
+    'Math',
+    'Computer Science',
+    'English',
+    'Science',
+    'Music',
+    'Other',
   ];
+
+  const schedules = {
+    US: [
+      '1st Period: 8:19am-9:14am',
+      '2nd Period: 9:52am-11:02am',
+      '3rd Period (flex): 11:06am-12:26pm',
+      '3rd Period (no flex): 11:31am-12:26pm',
+      '4th Period: 1:02pm-1:47pm',
+      '5th Period: 1:51pm-2:46pm',
+    ],
+    MS: [
+      '1st Period: 8:19am-9:14am',
+      '2nd Period: 10:02am-11:02am',
+      '3rd Period: 11:06am-11:56am',
+      '4th Period (no flex): 12:50pm-1:47pm',
+      '4th Period (flex): 12:26pm-1:47pm',
+      '5th Period: 1:51pm-2:46pm',
+    ],
+  };
 
   useEffect(() => {
     const fetchSubstitutes = async () => {
@@ -99,9 +129,10 @@ const TeacherScheduler = () => {
   const handleSearchSubstitutes = (event) => {
     const query = event.target.value.toLowerCase();
     setSearchQuery(query);
-    const filtered = substitutes.filter((sub) =>
-      `${sub.firstName} ${sub.lastName}`.toLowerCase().includes(query) ||
-      sub.tags.some((tag) => tag.toLowerCase().includes(query))
+    const filtered = substitutes.filter(
+      (sub) =>
+        `${sub.firstName} ${sub.lastName}`.toLowerCase().includes(query) ||
+        sub.tags.some((tag) => tag.toLowerCase().includes(query))
     );
     setFilteredSubstitutes(filtered);
   };
@@ -139,7 +170,34 @@ const TeacherScheduler = () => {
     });
   };
 
+  const handleSelectAllSubs = () => {
+    const allSubs = substitutes.map((sub) => ({
+      email: sub.email,
+      firstName: sub.firstName,
+      lastName: sub.lastName,
+    }));
+    setSelectedSubs(allSubs);
+    toast({
+      title: 'All Substitutes Selected',
+      description: 'All available substitutes added to chosen substitutes.',
+      status: 'success',
+      duration: 3000,
+      isClosable: true,
+      bg: inputBg,
+      color: mainColor,
+    });
+  };
+
   const handleBlockChange = (values) => setBlocks(values);
+
+  const handleSubjectSelect = (selectedSubject) => {
+    setSubject(selectedSubject);
+  };
+
+  const handleSchoolLevelChange = (event) => {
+    setSchoolLevel(event.target.value);
+    setBlocks([]); // Reset blocks when school level changes
+  };
 
   const handleNavigateHome = () => navigate('/teacher-home');
 
@@ -153,16 +211,19 @@ const TeacherScheduler = () => {
       setFormError('The selected date must be today or in the future.');
       return;
     }
-    if (!roomNumber || !requestDate) {
-      setFormError('Date and room number are required.');
+    if (!roomNumber || !requestDate || !subject || !schoolLevel) {
+      setFormError('Date, room number, subject, and school level are required.');
       return;
     }
+
+    const formattedSubject = `${schoolLevel}, ${subject}`;
 
     const payload = {
       teacherEmail: user.email,
       date: requestDate,
       room: roomNumber,
       blocks: blocks.join(', ') || '',
+      subject: formattedSubject,
       notes,
       teacherId: user.id,
       selectedSubs,
@@ -212,7 +273,9 @@ const TeacherScheduler = () => {
     <Box bg={bgColor} minH="100vh" p={6}>
       <Container maxW="container.2xl">
         <HStack justify="space-between" align="center" mb={8}>
-          <Heading size="xl" color={'rgb(255, 255, 255)'}>Schedule a Substitute</Heading>
+          <Heading size="xl" color={'rgb(255, 255, 255)'}>
+            Schedule a Substitute
+          </Heading>
           <Tooltip label="Return to Home" hasArrow>
             <IconButton
               icon={<ArrowBackIcon />}
@@ -230,13 +293,17 @@ const TeacherScheduler = () => {
           <GridItem>
             <Card bg={inputBg} boxShadow="xl" borderRadius="lg" p={4}>
               <CardHeader>
-                <Heading size="md" color={mainColor}>Request a Substitute</Heading>
+                <Heading size="md" color={mainColor}>
+                  Request a Substitute
+                </Heading>
               </CardHeader>
               <CardBody>
                 <form onSubmit={handleFormSubmit}>
                   <VStack spacing={5} align="stretch">
                     <FormControl isRequired isInvalid={!!formError && !requestDate}>
-                      <FormLabel color={mainColor} fontWeight="semibold">Date</FormLabel>
+                      <FormLabel color={mainColor} fontWeight="semibold">
+                        Date
+                      </FormLabel>
                       <InputGroup>
                         <InputLeftElement pointerEvents="none">
                           <CalendarIcon color={mainColor} />
@@ -254,10 +321,16 @@ const TeacherScheduler = () => {
                           pl={10}
                         />
                       </InputGroup>
-                      {formError && !requestDate && <Text color="red.600" fontSize="sm" mt={1}>{formError}</Text>}
+                      {formError && !requestDate && (
+                        <Text color="red.600" fontSize="sm" mt={1}>
+                          {formError}
+                        </Text>
+                      )}
                     </FormControl>
                     <FormControl isRequired isInvalid={!!formError && !roomNumber}>
-                      <FormLabel color={mainColor} fontWeight="semibold">Room Number(s)</FormLabel>
+                      <FormLabel color={mainColor} fontWeight="semibold">
+                        Room Number(s)
+                      </FormLabel>
                       <Input
                         value={roomNumber}
                         onChange={(e) => setRoomNumber(e.target.value)}
@@ -268,18 +341,73 @@ const TeacherScheduler = () => {
                         _hover={{ borderColor: accentColor }}
                         _focus={{ borderColor: accentColor, boxShadow: `0 0 0 1px ${accentColor}` }}
                       />
-                      {formError && !roomNumber && <Text color="red.600" fontSize="sm" mt={1}>{formError}</Text>}
+                      {formError && !roomNumber && (
+                        <Text color="red.600" fontSize="sm" mt={1}>
+                          {formError}
+                        </Text>
+                      )}
+                    </FormControl>
+                    <FormControl isRequired isInvalid={!!formError && !schoolLevel}>
+                      <FormLabel color={mainColor} fontWeight="semibold">
+                        School Level
+                      </FormLabel>
+                      <Select
+                        placeholder="Select school level"
+                        value={schoolLevel}
+                        onChange={handleSchoolLevelChange}
+                        bg={inputBg}
+                        color={mainColor}
+                        borderColor={mainColor}
+                        _hover={{ borderColor: accentColor }}
+                        _focus={{ borderColor: accentColor, boxShadow: `0 0 0 1px ${accentColor}` }}
+                      >
+                        <option value="US">Upper School (US)</option>
+                        <option value="MS">Middle School (MS)</option>
+                      </Select>
+                      {formError && !schoolLevel && (
+                        <Text color="red.600" fontSize="sm" mt={1}>
+                          {formError}
+                        </Text>
+                      )}
+                    </FormControl>
+                    <FormControl isRequired isInvalid={!!formError && !subject}>
+                      <FormLabel color={mainColor} fontWeight="semibold">
+                        Subject
+                      </FormLabel>
+                      <Wrap spacing={2}>
+                        {subjects.map((subj) => (
+                          <WrapItem key={subj}>
+                            <Tag
+                              size="lg"
+                              variant={subject === subj ? 'solid' : 'outline'}
+                              colorScheme={subject === subj ? 'blue' : 'gray'}
+                              cursor="pointer"
+                              onClick={() => handleSubjectSelect(subj)}
+                            >
+                              <TagLabel>{subj}</TagLabel>
+                            </Tag>
+                          </WrapItem>
+                        ))}
+                      </Wrap>
+                      {formError && !subject && (
+                        <Text color="red.600" fontSize="sm" mt={1}>
+                          {formError}
+                        </Text>
+                      )}
                     </FormControl>
                     <FormControl>
-                      <FormLabel color={mainColor} fontWeight="semibold">Block(s)</FormLabel>
+                      <FormLabel color={mainColor} fontWeight="semibold">
+                        Block(s)
+                      </FormLabel>
                       <CheckboxGroup value={blocks} onChange={handleBlockChange}>
                         <VStack align="start" spacing={2} p={2}>
-                          {periods.map((p, index) => (
+                          {(schoolLevel ? schedules[schoolLevel] : []).map((p, index) => (
                             <Checkbox
                               key={index}
                               value={p}
                               color={mainColor}
                               _hover={{ bg: accentColor, borderRadius: 'md' }}
+                              isDisabled={!schoolLevel}
                             >
                               {p}
                             </Checkbox>
@@ -288,7 +416,9 @@ const TeacherScheduler = () => {
                       </CheckboxGroup>
                     </FormControl>
                     <FormControl>
-                      <FormLabel color={mainColor} fontWeight="semibold">Notes</FormLabel>
+                      <FormLabel color={mainColor} fontWeight="semibold">
+                        Notes
+                      </FormLabel>
                       <Textarea
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
@@ -311,7 +441,10 @@ const TeacherScheduler = () => {
                       type="submit"
                       bgGradient="linear(to-r, rgb(175, 214, 241), rgb(100, 150, 200))"
                       color={mainColor}
-                      _hover={{ bgGradient: 'linear(to-r, rgb(200, 230, 255), rgb(120, 170, 220))', transform: 'scale(1.02)' }}
+                      _hover={{
+                        bgGradient: 'linear(to-r, rgb(200, 230, 255), rgb(120, 170, 220))',
+                        transform: 'scale(1.02)',
+                      }}
                       _active={{ transform: 'scale(0.98)' }}
                       transition="all 0.2s"
                       isDisabled={isSubmitted}
@@ -324,15 +457,17 @@ const TeacherScheduler = () => {
                 </form>
                 {emailPreview && (
                   <Box mt={8}>
-                    <Heading size="sm" mb={3} color={mainColor}>Email Preview</Heading>
+                    <Heading size="sm" mb={3} color={mainColor}>
+                      Email Preview
+                    </Heading>
                     <Card bg={inputBg} boxShadow="xl" borderRadius="lg" p={4}>
                       <CardBody>
                         <Box
                           dangerouslySetInnerHTML={{ __html: emailPreview }}
                           sx={{
                             '& > *': { color: mainColor, fontSize: 'sm' },
-                            'h2': { fontSize: 'lg', fontWeight: 'bold', mb: 2 },
-                            'p': { mb: 1 },
+                            h2: { fontSize: 'lg', fontWeight: 'bold', mb: 2 },
+                            p: { mb: 1 },
                           }}
                         />
                       </CardBody>
@@ -345,25 +480,42 @@ const TeacherScheduler = () => {
           <GridItem>
             <Card bg={inputBg} boxShadow="xl" borderRadius="lg" p={4} maxH="600px" overflowY="auto">
               <CardHeader>
-                <Heading size="md" color={mainColor}>Available Substitutes</Heading>
+                <Heading size="md" color={mainColor}>
+                  Available Substitutes
+                </Heading>
               </CardHeader>
               <CardBody>
-                <InputGroup mb={4}>
-                  <InputLeftElement pointerEvents="none">
-                    <SearchIcon color={mainColor} />
-                  </InputLeftElement>
-                  <Input
-                    value={searchQuery}
-                    onChange={handleSearchSubstitutes}
-                    placeholder="Search by name or tag"
-                    bg={inputBg}
-                    color={mainColor}
-                    borderColor={mainColor}
-                    _hover={{ borderColor: accentColor }}
-                    _focus={{ borderColor: accentColor, boxShadow: `0 0 0 1px ${accentColor}` }}
-                    pl={10}
-                  />
-                </InputGroup>
+                <HStack mb={4}>
+                  <InputGroup>
+                    <InputLeftElement pointerEvents="none">
+                      <SearchIcon color={mainColor} />
+                    </InputLeftElement>
+                    <Input
+                      value={searchQuery}
+                      onChange={handleSearchSubstitutes}
+                      placeholder="Search by name or tag"
+                      bg={inputBg}
+                      color={mainColor}
+                      borderColor={mainColor}
+                      _hover={{ borderColor: accentColor }}
+                      _focus={{ borderColor: accentColor, boxShadow: `0 0 0 1px ${accentColor}` }}
+                      pl={10}
+                    />
+                  </InputGroup>
+                  <Tooltip label="Select all substitutes" hasArrow>
+                    <Button
+                      size="sm"
+                      bg={accentColor}
+                      color={mainColor}
+                      _hover={{ bg: inputBg, color: mainColor, transform: 'scale(1.05)' }}
+                      transition="all 0.2s"
+                      onClick={handleSelectAllSubs}
+                      leftIcon={<CheckIcon />}
+                    >
+                      Select All
+                    </Button>
+                  </Tooltip>
+                </HStack>
                 <List spacing={3}>
                   {(filteredSubstitutes.length > 0 ? filteredSubstitutes : substitutes).map((sub) => {
                     const isSelected = selectedSubs.some((s) => s.email === sub.email);
@@ -384,7 +536,9 @@ const TeacherScheduler = () => {
                                 <Text fontWeight="bold" color={mainColor} fontSize="sm">
                                   {`${sub.firstName} ${sub.lastName}`}
                                 </Text>
-                                <Text fontSize="xs" color={mainColor}>Email: {sub.email}</Text>
+                                <Text fontSize="xs" color={mainColor}>
+                                  Email: {sub.email}
+                                </Text>
                                 <Text fontSize="xs" color={mainColor}>
                                   Tags:{' '}
                                   {sub.tags.map((tag, idx) => (
@@ -399,7 +553,9 @@ const TeacherScheduler = () => {
                                     </Badge>
                                   ))}
                                 </Text>
-                                <Text fontSize="xs" color={mainColor}>Phone: {sub.phoneNumber}</Text>
+                                <Text fontSize="xs" color={mainColor}>
+                                  Phone: {sub.phoneNumber}
+                                </Text>
                               </Box>
                               <HStack justify="flex-end">
                                 <Tooltip label="Add to chosen substitutes" hasArrow>
@@ -421,7 +577,7 @@ const TeacherScheduler = () => {
                                     size="sm"
                                     bg="red.500"
                                     color="white"
-                                    _hover={{ bg: "red.600", transform: 'scale(1.05)' }}
+                                    _hover={{ bg: 'red.600', transform: 'scale(1.05)' }}
                                     transition="all 0.2s"
                                     onClick={() => handleRemoveSub(sub.email)}
                                     leftIcon={<CloseIcon />}
@@ -442,7 +598,9 @@ const TeacherScheduler = () => {
             </Card>
             <Card bg={inputBg} boxShadow="xl" borderRadius="lg" mt={4} p={4}>
               <CardHeader>
-                <Heading size="md" color={mainColor}>Chosen Substitutes</Heading>
+                <Heading size="md" color={mainColor}>
+                  Chosen Substitutes
+                </Heading>
               </CardHeader>
               <CardBody>
                 {selectedSubs.length > 0 ? (
@@ -454,7 +612,9 @@ const TeacherScheduler = () => {
                     ))}
                   </List>
                 ) : (
-                  <Text color={mainColor} fontSize="sm">No substitutes chosen.</Text>
+                  <Text color={mainColor} fontSize="sm">
+                    No substitutes chosen.
+                  </Text>
                 )}
               </CardBody>
             </Card>

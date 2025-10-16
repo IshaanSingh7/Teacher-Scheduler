@@ -1,11 +1,231 @@
-import { useEffect, useState } from 'react';
+// import { useState, useEffect } from 'react';
+// import {
+//   Box,
+//   Card,
+//   CardBody,
+//   Heading,
+//   Table,
+//   Thead,
+//   Tbody,
+//   Tr,
+//   Th,
+//   Td,
+//   Text,
+//   useToast,
+//   Spinner,
+//   Button,
+//   AlertDialog,
+//   AlertDialogBody,
+//   AlertDialogFooter,
+//   AlertDialogHeader,
+//   AlertDialogContent,
+//   AlertDialogOverlay,
+// } from '@chakra-ui/react';
+// import { useNavigate } from 'react-router-dom';
+// import { useAuth } from '../AuthContext';
+
+// const SubstituteHome = () => {
+//   const [requests, setRequests] = useState([]);
+//   const [isLoading, setIsLoading] = useState(true);
+//   const [cancelRequestId, setCancelRequestId] = useState(null);
+//   const [isCancelOpen, setIsCancelOpen] = useState(false);
+//   const { user, isAuthenticated } = useAuth();
+//   const navigate = useNavigate();
+//   const toast = useToast();
+
+//   const mainColor = 'rgb(20, 54, 100)';
+//   const accentColor = 'rgb(175, 214, 241)';
+//   const bgColor = 'rgb(30, 64, 110)';
+//   const inputBg = '#FFFFFF';
+
+//   useEffect(() => {
+//     if (!isAuthenticated || user.role !== 'substitute') {
+//       navigate('/login');
+//       return;
+//     }
+
+//     const fetchRequests = async () => {
+//       try {
+//         const response = await fetch(`http://localhost:3001/substitute-requests?email=${encodeURIComponent(user.email)}`);
+//         if (response.ok) {
+//           const data = await response.json();
+//           setRequests(data);
+//         } else {
+//           throw new Error('Failed to fetch requests');
+//         }
+//       } catch (error) {
+//         console.error('Error fetching requests:', error);
+//         toast({
+//           title: 'Error',
+//           description: 'Failed to fetch requests.',
+//           status: 'error',
+//           duration: 5000,
+//           isClosable: true,
+//           bg: inputBg,
+//           color: mainColor,
+//         });
+//       } finally {
+//         setIsLoading(false);
+//       }
+//     };
+
+//     fetchRequests();
+//   }, [isAuthenticated, user, navigate, toast]);
+
+//   const handleCancel = async (requestId) => {
+//     try {
+//       const response = await fetch('http://localhost:3001/cancel-assignment', {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify({ email: user.email, requestId }),
+//       });
+
+//       if (!response.ok) {
+//         const text = await response.text();
+//         console.error('Cancel response:', text);
+//         throw new Error(`Server responded with ${response.status}: ${text}`);
+//       }
+
+//       const data = await response.json();
+//       if (data.added) {
+//         setRequests(requests.filter(req => req.id !== requestId));
+//         toast({
+//           title: 'Success',
+//           description: 'Assignment canceled successfully.',
+//           status: 'success',
+//           duration: 5000,
+//           isClosable: true,
+//           bg: inputBg,
+//           color: mainColor,
+//         });
+//       } else {
+//         throw new Error(data.error || 'Failed to cancel assignment');
+//       }
+//     } catch (error) {
+//       console.error('Error canceling assignment:', error);
+//       toast({
+//         title: 'Error',
+//         description: error.message || 'Failed to cancel assignment.',
+//         status: 'error',
+//         duration: 5000,
+//         isClosable: true,
+//         bg: inputBg,
+//         color: mainColor,
+//       });
+//     }
+//     setIsCancelOpen(false);
+//     setCancelRequestId(null);
+//   };
+
+//   const openCancelDialog = (requestId) => {
+//     setCancelRequestId(requestId);
+//     setIsCancelOpen(true);
+//   };
+
+//   const closeCancelDialog = () => {
+//     setIsCancelOpen(false);
+//     setCancelRequestId(null);
+//   };
+
+//   if (isLoading) {
+//     return (
+//       <Box minH="100vh" display="flex" justifyContent="center" alignItems="center" bg={bgColor}>
+//         <Spinner size="xl" color={accentColor} />
+//       </Box>
+//     );
+//   }
+
+//   return (
+//     <Box minH="100vh" bg={bgColor} py={8} px={{ base: 4, md: 8 }}>
+//       <Heading size="lg" mb={6} color={inputBg} textAlign="center">
+//         Hello {user.first_name} {user.last_name}
+//       </Heading>
+//       <Card bg={inputBg} boxShadow="lg" borderRadius="lg">
+//         <CardBody>
+//           <Heading size="md" mb={4} color={mainColor}>
+//             Your Assigned Blocks
+//           </Heading>
+//           {requests.length === 0 ? (
+//             <Text color={mainColor}>No assigned blocks.</Text>
+//           ) : (
+//             <Table variant="simple" colorScheme="blue">
+//               <Thead>
+//                 <Tr>
+//                   <Th color={mainColor}>Teacher</Th>
+//                   <Th color={mainColor}>Day</Th>
+//                   <Th color={mainColor}>Subject</Th>
+//                   <Th color={mainColor}>Room</Th>
+//                   <Th color={mainColor}>Blocks</Th>
+//                   <Th color={mainColor}>Notes</Th>
+//                   <Th color={mainColor}>Action</Th>
+//                 </Tr>
+//               </Thead>
+//               <Tbody>
+//                 {requests.map(request => (
+//                   <Tr key={request.id}>
+//                     <Td color={mainColor}>{request.teacher_name}</Td>
+//                     <Td color={mainColor}>{request.day}</Td>
+//                     <Td color={mainColor}>{request.subject}</Td>
+//                     <Td color={mainColor}>{request.room}</Td>
+//                     <Td color={mainColor}>{request.blocks.join(', ')}</Td>
+//                     <Td color={mainColor}>{request.notes || 'None'}</Td>
+//                     <Td>
+//                       <Button
+//                         size="sm"
+//                         colorScheme="red"
+//                         onClick={() => openCancelDialog(request.id)}
+//                       >
+//                         Cancel
+//                       </Button>
+//                     </Td>
+//                   </Tr>
+//                 ))}
+//               </Tbody>
+//             </Table>
+//           )}
+//         </CardBody>
+//       </Card>
+
+//       <AlertDialog
+//         isOpen={isCancelOpen}
+//         onClose={closeCancelDialog}
+//         isCentered
+//       >
+//         <AlertDialogOverlay>
+//           <AlertDialogContent bg={inputBg}>
+//             <AlertDialogHeader fontSize="lg" fontWeight="bold" color={mainColor}>
+//               Cancel Assignment
+//             </AlertDialogHeader>
+//             <AlertDialogBody color={mainColor}>
+//               Are you sure you want to cancel this assignment? This action cannot be undone.
+//             </AlertDialogBody>
+//             <AlertDialogFooter>
+//               <Button onClick={closeCancelDialog} color={mainColor}>
+//                 No
+//               </Button>
+//               <Button
+//                 colorScheme="red"
+//                 onClick={() => handleCancel(cancelRequestId)}
+//                 ml={3}
+//               >
+//                 Yes, Cancel
+//               </Button>
+//             </AlertDialogFooter>
+//           </AlertDialogContent>
+//         </AlertDialogOverlay>
+//       </AlertDialog>
+//     </Box>
+//   );
+// };
+
+// export default SubstituteHome;
+
+import { useState, useEffect } from 'react';
 import {
   Box,
-  Button,
   Card,
   CardBody,
   Heading,
-  VStack,
   Table,
   Thead,
   Tbody,
@@ -13,83 +233,54 @@ import {
   Th,
   Td,
   Text,
-  Spinner,
   useToast,
-  Tooltip,
-  Icon,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  List,
-  UnorderedList,
-  ListItem,
-  useDisclosure,
-  HStack,
+  Spinner,
+  Button,
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogContent,
+  AlertDialogOverlay,
 } from '@chakra-ui/react';
-import { WarningIcon, CalendarIcon } from '@chakra-ui/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 
-const SubstituteHome = ({ onLogout }) => {
-  const [acceptedRequests, setAcceptedRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
+const SubstituteHome = () => {
+  const [requests, setRequests] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [cancelRequestId, setCancelRequestId] = useState(null);
-  const [completeRequestId, setCompleteRequestId] = useState(null);
-  const { isOpen: isCancelOpen, onOpen: onCancelOpen, onClose: onCancelClose } = useDisclosure();
-  const { isOpen: isCompleteOpen, onOpen: onCompleteOpen, onClose: onCompleteClose } = useDisclosure();
-  const { user, isAuthenticated, logout } = useAuth();
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
+  const [selectedNotes, setSelectedNotes] = useState(null);
+  const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
 
-  // Theme colors
   const mainColor = 'rgb(20, 54, 100)';
   const accentColor = 'rgb(175, 214, 241)';
-  const bgColor = 'rgb(20, 54, 100)';
+  const bgColor = 'rgb(30, 64, 110)';
   const inputBg = '#FFFFFF';
 
   useEffect(() => {
-    if (!isAuthenticated || !user || user.role !== 'substitute') {
+    if (!isAuthenticated || user.role !== 'substitute') {
       navigate('/login');
       return;
     }
 
-    const fetchData = async () => {
+    const fetchRequests = async () => {
       try {
-        const response = await fetch(`http://localhost:3001/accepted-requests?email=${encodeURIComponent(user.email)}`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        });
-
+        const response = await fetch(`http://localhost:3001/substitute-requests?email=${encodeURIComponent(user.email)}`);
         if (response.ok) {
-          const responseData = await response.json();
-          const formattedData = responseData.map(req => ({
-            ...req,
-            status: req.status || 'uncompleted'
-          }));
-          setAcceptedRequests(formattedData);
+          const data = await response.json();
+          setRequests(data);
         } else {
-          toast({
-            title: 'Error',
-            description: 'Failed to fetch requests.',
-            status: 'error',
-            duration: 5000,
-            isClosable: true,
-            bg: inputBg,
-            color: mainColor,
-          });
+          throw new Error('Failed to fetch requests');
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('Error fetching requests:', error);
         toast({
           title: 'Error',
-          description: 'Error fetching requests.',
+          description: 'Failed to fetch requests.',
           status: 'error',
           duration: 5000,
           isClosable: true,
@@ -97,92 +288,33 @@ const SubstituteHome = ({ onLogout }) => {
           color: mainColor,
         });
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
 
-    fetchData();
-  }, [user, isAuthenticated, navigate, toast]);
+    fetchRequests();
+  }, [isAuthenticated, user, navigate, toast]);
 
-  const handleCancelInitiate = (requestId) => {
-    setCancelRequestId(requestId);
-    onCancelOpen();
-  };
-
-  const handleCancelConfirm = async () => {
-  if (!cancelRequestId) return;
-
-  try {
-    const response = await fetch(`http://localhost:3001/requests/${cancelRequestId}/cancel-substitute`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: user.email }),
-    });
-
-    if (response.ok) {
-      setAcceptedRequests((prev) => prev.filter((req) => req.id !== cancelRequestId));
-      toast({
-        title: 'Success',
-        description: 'Request cancelled successfully.',
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
-        bg: inputBg,
-        color: mainColor,
-      });
-    } else {
-      const errorResponse = await response.json();
-      toast({
-        title: 'Error',
-        description: errorResponse.error || 'Failed to cancel request.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-        bg: inputBg,
-        color: mainColor,
-      });
-    }
-  } catch (error) {
-    console.error('Error cancelling request:', error);
-    toast({
-      title: 'Error',
-      description: 'Error cancelling request.',
-      status: 'error',
-      duration: 5000,
-      isClosable: true,
-      bg: inputBg,
-      color: mainColor,
-    });
-  } finally {
-    onCancelClose();
-    setCancelRequestId(null);
-  }
-};
-
-  const handleCompleteInitiate = (requestId) => {
-    setCompleteRequestId(requestId);
-    onCompleteOpen();
-  };
-
-  const handleCompleteConfirm = async () => {
-    if (!completeRequestId) return;
-
+  const handleCancel = async (requestId) => {
     try {
-      const response = await fetch(`http://localhost:3001/requests/${completeRequestId}/complete`, {
-        method: 'PATCH',
+      const response = await fetch('http://localhost:3001/cancel-assignment', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: user.email }),
+        body: JSON.stringify({ email: user.email, requestId }),
       });
 
-      if (response.ok) {
-        setAcceptedRequests((prev) =>
-          prev.map((req) =>
-            req.id === completeRequestId ? { ...req, status: 'completed' } : req
-          )
-        );
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('Cancel response:', text);
+        throw new Error(`Server responded with ${response.status}: ${text}`);
+      }
+
+      const data = await response.json();
+      if (data.added) {
+        setRequests(requests.filter(req => req.id !== requestId));
         toast({
           title: 'Success',
-          description: 'Request marked as completed.',
+          description: 'Assignment canceled successfully.',
           status: 'success',
           duration: 5000,
           isClosable: true,
@@ -190,77 +322,13 @@ const SubstituteHome = ({ onLogout }) => {
           color: mainColor,
         });
       } else {
-        const errorResponse = await response.json();
-        toast({
-          title: 'Error',
-          description: errorResponse.error || 'Failed to mark request as completed.',
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-          bg: inputBg,
-          color: mainColor,
-        });
+        throw new Error(data.error || 'Failed to cancel assignment');
       }
     } catch (error) {
-      console.error('Error completing request:', error);
+      console.error('Error canceling assignment:', error);
       toast({
         title: 'Error',
-        description: 'Error completing request.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-        bg: inputBg,
-        color: mainColor,
-      });
-    } finally {
-      onCompleteClose();
-      setCompleteRequestId(null);
-    }
-  };
-
-  const handleDismiss = (requestId) => {
-    setAcceptedRequests((prev) => prev.filter((req) => req.id !== requestId));
-    toast({
-      title: 'Success',
-      description: 'Request dismissed.',
-      status: 'success',
-      duration: 5000,
-      isClosable: true,
-      bg: inputBg,
-      color: mainColor,
-    });
-  };
-
-  const handleCopyEmail = async (teacherEmail) => {
-    if (!teacherEmail) {
-      toast({
-        title: 'Error',
-        description: 'No email available for this teacher.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-        bg: inputBg,
-        color: mainColor,
-      });
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(teacherEmail);
-      toast({
-        title: 'Success',
-        description: `Email ${teacherEmail} copied to clipboard!`,
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
-        bg: inputBg,
-        color: mainColor,
-      });
-    } catch (error) {
-      console.error('Error copying email:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to copy email to clipboard.',
+        description: error.message || 'Failed to cancel assignment.',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -268,347 +336,234 @@ const SubstituteHome = ({ onLogout }) => {
         color: mainColor,
       });
     }
+    setIsCancelOpen(false);
+    setCancelRequestId(null);
   };
 
-  const generateGoogleCalendarLinks = (request) => {
-    const { day, blocks_requested, teacher_first_name, teacher_last_name, room, notes, subject } = request;
-    if (!day || !blocks_requested || !user.email) return [];
-
-    const blockTimes = {
-      '1st Period: 8:19am-9:14am': { start: '08:19', end: '09:14' },
-      '2nd Period: 9:52am-11:02am': { start: '09:52', end: '11:02' },
-      '3rd Period (flex): 11:06am-12:26pm': { start: '11:06', end: '12:26' },
-      '3rd Period (no flex): 11:31am-12:26pm': { start: '11:31', end: '12:26' },
-      '4th Period: 1:02pm-1:47pm': { start: '13:02', end: '13:47' },
-      '5th Period: 1:51pm-2:46pm': { start: '13:51', end: '14:46' },
-    };
-
-    const blocks = blocks_requested.split(',').map(block => block.trim());
-    const date = new Date(day);
-    if (isNaN(date)) {
-      console.warn(`Invalid date for request ${request.id}: ${day}`);
-      return [];
-    }
-
-    const formatDateTime = (date, time) => {
-      const [hours, minutes] = time.split(':');
-      const dt = new Date(date);
-      dt.setHours(parseInt(hours), parseInt(minutes), 0);
-      return dt.toISOString().replace(/[-:]/g, '').replace('.000Z', 'Z');
-    };
-
-    return blocks.map(block => {
-      const periodMatch = Object.keys(blockTimes).find(key => block.includes(key.split(':')[0]));
-      if (!periodMatch) {
-        console.warn(`Unrecognized block for request ${request.id}: ${block}`);
-        return null;
-      }
-
-      const { start, end } = blockTimes[periodMatch];
-      const startTime = formatDateTime(date, start);
-      const endTime = formatDateTime(date, end);
-      const teacherName = `${teacher_first_name} ${teacher_last_name}`;
-      const title = encodeURIComponent(`Substitute for ${teacherName} - ${subject} - ${block}`);
-      const details = encodeURIComponent(`Teacher: ${teacherName}\nSubject: ${subject}\nRoom: ${room}\nNotes: ${notes || 'None'}`);
-      const location = encodeURIComponent(room);
-      const attendees = encodeURIComponent(user.email);
-
-      return {
-        block,
-        url: `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startTime}/${endTime}&details=${details}&location=${location}&add=${attendees}`,
-      };
-    }).filter(link => link);
+  const openCancelDialog = (requestId) => {
+    setCancelRequestId(requestId);
+    setIsCancelOpen(true);
   };
 
-  return (
-    <Box minH="100vh" bg={bgColor} py={8} px={{ base: 4, md: 8 }}>
-      {loading ? (
-        <Box minH="100vh" display="flex" justifyContent="center" alignItems="center" bg={bgColor}>
-          <Spinner size="xl" color={accentColor} />
-        </Box>
-      ) : (
-        <>
-          <Card bg={inputBg} boxShadow="lg" borderRadius="lg" mb={6}>
-            <CardBody>
-              <HStack justify="space-between" align="center" flexWrap="wrap" spacing={3}>
-                <Heading size="lg" color={mainColor}>
-                  Hello {user.first_name} {user.last_name}!
-                </Heading>
-                <Button
-                  bg={accentColor}
-                  color={mainColor}
-                  _hover={{ bg: inputBg, color: mainColor }}
-                  onClick={logout}
-                  size="md"
-                >
-                  Logout
-                </Button>
-              </HStack>
-            </CardBody>
-          </Card>
+  const closeCancelDialog = () => {
+    setIsCancelOpen(false);
+    setCancelRequestId(null);
+  };
 
-          <Card bg={inputBg} boxShadow="lg" borderRadius="lg">
-            <CardBody>
-              <Heading size="md" mb={4} textAlign="center" color={mainColor}>
-                Requests You've Accepted
-              </Heading>
-              <Box overflowX="auto">
-                <Table size="sm" variant="simple" bg={inputBg} borderRadius="md" width="100%">
-                  <Thead bg={accentColor}>
-                    <Tr>
-                      <Th color={mainColor} whiteSpace="nowrap" width="10%">Date (Y/M/D)</Th>
-                      <Th color={mainColor} whiteSpace="nowrap" width="15%">Teacher</Th>
-                      <Th color={mainColor} whiteSpace="nowrap" width="10%">Subject</Th>
-                      <Th color={mainColor} whiteSpace="nowrap" width="5%">Room</Th>
-                      <Th color={mainColor} width="30%" minWidth="200px">Blocks Requested</Th>
-                      <Th color={mainColor} whiteSpace="nowrap" width="10%">Notes</Th>
-                      <Th color={mainColor} whiteSpace="nowrap" width="10%">Status</Th>
-                      <Th color={mainColor} whiteSpace="nowrap" width="15%">Action</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {acceptedRequests.length > 0 ? (
-                      acceptedRequests.map((request) => {
-                        const calendarLinks = generateGoogleCalendarLinks(request);
-                        const blocks = request.blocks_requested
-                          ? request.blocks_requested.split(',').map(row => row.trim())
-                          : [];
-                        const status = request.status || 'uncompleted';
-                        const isCompleted = status === 'completed';
-                        return (
-                          <Tr key={request.id} bg={isCompleted ? 'gray.100' : undefined} opacity={isCompleted ? 0.6 : 1}>
-                            <Td color={mainColor} whiteSpace="nowrap">{request.day}</Td>
-                            <Td color={mainColor}>
-                              <Tooltip
-                                label={request.teacher_email ? `Copy email address` : 'No email available'}
-                                hasArrow
-                                placement="top"
-                                bg={inputBg}
-                                color={mainColor}
-                              >
-                                <Button
-                                  variant="link"
-                                  color={mainColor}
-                                  size="sm"
-                                  _hover={{ color: request.teacher_email ? accentColor : mainColor }}
-                                  isTruncated
-                                  maxWidth="120px"
-                                  display="inline-block"
-                                  onClick={() => handleCopyEmail(request.teacher_email)}
-                                  isDisabled={!request.teacher_email || isCompleted}
-                                >
-                                  {request.teacher_first_name} {request.teacher_last_name}
-                                </Button>
-                              </Tooltip>
-                            </Td>
-                            <Td color={mainColor}>{request.subject || '-'}</Td>
-                            <Td color={mainColor}>{request.room}</Td>
-                            <Td color={mainColor} whiteSpace="normal">
-                              {blocks.length > 0 ? (
-                                <UnorderedList spacing={1} maxWidth="100%">
-                                  {blocks.map((block, index) => (
-                                    <ListItem key={index} fontSize="14px">
-                                      {block}
-                                    </ListItem>
-                                  ))}
-                                </UnorderedList>
-                              ) : (
-                                <Text>-</Text>
-                              )}
-                            </Td>
-                            <Td>
-                              <Tooltip label={request.notes || 'No notes'} hasArrow placement="top" maxWidth="300px" bg={inputBg} color={mainColor}>
-                                <Button
-                                  variant="link"
-                                  color={mainColor}
-                                  size="sm"
-                                  _hover={{ color: accentColor }}
-                                  isDisabled={isCompleted}
-                                >
-                                  View Notes
-                                </Button>
-                              </Tooltip>
-                            </Td>
-                            <Td color={mainColor}>
-                              <Text color={status === 'completed' ? 'green.500' : 'orange.500'}>
-                                {status.charAt(0).toUpperCase() + status.slice(1)}
-                              </Text>
-                            </Td>
-                            <Td>
-                              <VStack spacing={1}>
-                                {!isCompleted && (
-                                  <Button
-                                    bg="green.500"
-                                    color="white"
-                                    _hover={{ bg: 'green.600' }}
-                                    size="xs"
-                                    px={2}
-                                    height="24px"
-                                    minHeight="24px"
-                                    onClick={() => handleCompleteInitiate(request.id)}
-                                    isDisabled={isCompleted}
-                                  >
-                                    Complete
-                                  </Button>
-                                )}
-                                <Button
-                                  bg={accentColor}
-                                  color={mainColor}
-                                  _hover={{ bg: inputBg, color: mainColor }}
-                                  size="xs"
-                                  px={2}
-                                  height="24px"
-                                  minHeight="24px"
-                                  onClick={() => handleCancelInitiate(request.id)}
-                                  isDisabled={isCompleted}
-                                >
-                                  Cancel
-                                </Button>
-                                {calendarLinks.length > 0 ? (
-                                  <Menu>
-                                    <MenuButton
-                                      as={Button}
-                                      size="xs"
-                                      bg={accentColor}
-                                      color={mainColor}
-                                      _hover={{ bg: inputBg, color: mainColor }}
-                                      leftIcon={<CalendarIcon />}
-                                      px={2}
-                                      height="24px"
-                                      minHeight="24px"
-                                      width="100%"
-                                      textAlign="left"
-                                      isDisabled={isCompleted}
-                                    >
-                                      Calendar
-                                    </MenuButton>
-                                    <MenuList bg={inputBg}>
-                                      {calendarLinks.map((link, index) => (
-                                        <MenuItem
-                                          key={index}
-                                          as="a"
-                                          href={link.url}
-                                          target="_blank"
-                                          bg={inputBg}
-                                          color={mainColor}
-                                          _hover={{ bg: accentColor, color: mainColor }}
-                                        >
-                                          {link.block}
-                                        </MenuItem>
-                                      ))}
-                                    </MenuList>
-                                  </Menu>
-                                ) : (
-                                  <Button
-                                    size="xs"
-                                    px={2}
-                                    height="24px"
-                                    minHeight="24px"
-                                    bg={accentColor}
-                                    color={mainColor}
-                                    isDisabled
-                                  >
-                                    Calendar
-                                  </Button>
-                                )}
-                                {isCompleted && (
-                                  <Button
-                                    bg="gray.500"
-                                    color="white"
-                                    _hover={{ bg: 'gray.600' }}
-                                    size="xs"
-                                    px={2}
-                                    height="24px"
-                                    minHeight="24px"
-                                    onClick={() => handleDismiss(request.id)}
-                                  >
-                                    Dismiss
-                                  </Button>
-                                )}
-                              </VStack>
-                            </Td>
-                          </Tr>
-                        );
-                      })
-                    ) : (
-                      <Tr>
-                        <Td colSpan={8} textAlign="center" py={8}>
-                          <HStack justify="center" align="center" spacing={2}>
-                            <Icon as={WarningIcon} color={mainColor} />
-                            <Text fontWeight="bold" color={mainColor}>
-                              Looks like you haven't accepted any requests!
-                            </Text>
-                          </HStack>
-                        </Td>
-                      </Tr>
-                    )}
-                  </Tbody>
-                </Table>
-              </Box>
-            </CardBody>
-          </Card>
+  const openNotesDialog = (notes) => {
+    setSelectedNotes(notes || 'No notes provided.');
+  };
 
-          <Modal isOpen={isCancelOpen} onClose={onCancelClose} isCentered>
-            <ModalOverlay />
-            <ModalContent bg={inputBg} color={mainColor}>
-              <ModalHeader>Confirm Cancellation</ModalHeader>
-              <ModalBody>
-                <Text>Are you sure you want to cancel this substitute request?</Text>
-              </ModalBody>
-              <ModalFooter>
-                <Button
-                  bg={accentColor}
-                  color={mainColor}
-                  _hover={{ bg: inputBg, color: mainColor }}
-                  marginRight={2}
-                  onClick={onCancelClose}
-                >
-                  Back
-                </Button>
-                <Button
-                  bg="red.500"
-                  color="white"
-                  _hover={{ bg: 'red.600' }}
-                  onClick={handleCancelConfirm}
-                >
-                  Confirm
-                </Button>
-              </ModalFooter>
-            </ModalContent>
-          </Modal>
+  const closeNotesDialog = () => {
+    setSelectedNotes(null);
+  };
 
-          <Modal isOpen={isCompleteOpen} onClose={onCompleteClose} isCentered>
-            <ModalOverlay />
-            <ModalContent bg={inputBg} color={mainColor}>
-              <ModalHeader>Confirm Completion</ModalHeader>
-              <ModalBody>
-                <Text>Are you sure you want to mark this substitute request as completed? An email will be sent to the teacher.</Text>
-              </ModalBody>
-              <ModalFooter>
-                <Button
-                  bg={accentColor}
-                  color={mainColor}
-                  _hover={{ bg: inputBg, color: mainColor }}
-                  marginRight={2}
-                  onClick={onCompleteClose}
-                >
-                  Back
-                </Button>
-                <Button
-                  bg="green.500"
-                  color="white"
-                  _hover={{ bg: 'green.600' }}
-                  onClick={handleCompleteConfirm}
-                >
-                  Confirm
-                </Button>
-              </ModalFooter>
-            </ModalContent>
-          </Modal>
-        </>
-      )}
-    </Box>
-  );
+  const getBlockNumber = (block) => {
+    if (!block) return 999;
+    const firstChar = block.trim()[0];
+    const num = parseInt(firstChar, 10);
+    return isNaN(num) ? 999 : num;
+  };
+
+  if (isLoading) {
+    return (
+      <Box minH="100vh" display="flex" justifyContent="center" alignItems="center" bg={bgColor}>
+        <Spinner size="xl" color={accentColor} />
+      </Box>
+    );
+  }
+return (
+  <Box minH="100vh" bg={bgColor} py={8} px={{ base: 4, md: 8 }}>
+    <Heading size="lg" mb={6} color={inputBg} textAlign="center">
+      Hello {user.first_name} {user.last_name}
+    </Heading>
+    <Card bg={inputBg} boxShadow="lg" borderRadius="lg">
+      <CardBody>
+        <Heading size="md" mb={4} color={mainColor}>
+          Your Assigned Blocks
+        </Heading>
+        {requests.length === 0 ? (
+          <Text color={mainColor}>No assigned blocks.</Text>
+        ) : (
+          <Table variant="simple" colorScheme="blue">
+            <Thead>
+              <Tr>
+                <Th color={mainColor}>Teacher</Th>
+                <Th color={mainColor}>Day</Th>
+                <Th color={mainColor}>Subject</Th>
+                <Th color={mainColor}>Room</Th>
+                <Th color={mainColor}>Blocks</Th>
+                <Th color={mainColor}>Notes</Th>
+                <Th color={mainColor}>Action</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {requests.map((request) => {
+                const formattedDay = request.day
+                  ? new Date(request.day).toLocaleDateString('en-US', {
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })
+                  : '';
+
+                const sortedBlocks = [...request.blocks].sort((a, b) => {
+                  const numA = parseInt(a[0], 10);
+                  const numB = parseInt(b[0], 10);
+                  return numA - numB;
+                });
+
+                return (
+                  <Tr key={request.id}>
+                    {/* Teacher name as copy-to-clipboard button */}
+                    <Td color={mainColor}>
+                      <Button
+                        size="sm"
+                        variant="link"
+                        colorScheme="blue"
+                        onClick={() => {
+                          navigator.clipboard.writeText(request.teacher_email);
+                          toast({
+                            title: 'Copied',
+                            description: `Copied ${request.teacher_email} to clipboard`,
+                            status: 'success',
+                            duration: 3000,
+                            isClosable: true,
+                            bg: inputBg,
+                            color: mainColor,
+                          });
+                        }}
+                      >
+                        {request.teacher_name}
+                      </Button>
+                    </Td>
+
+                    <Td color={mainColor}>{formattedDay}</Td>
+                    <Td color={mainColor}>{request.subject}</Td>
+                    <Td color={mainColor}>{request.room}</Td>
+
+                    {/* Blocks: individual buttons for each block */}
+                    <Td color={mainColor}>
+                      <Box display="flex" flexDirection="column" gap={2}>
+                        {sortedBlocks.map((block, i) => (
+                          <Button
+                            key={i}
+                            size="sm"
+                            colorScheme="blue"
+                            onClick={() => {
+                              const eventDate = new Date(request.day);
+                              const timeMatch = block.match(/(\d{1,2}:\d{2}(?:am|pm))-(\d{1,2}:\d{2}(?:am|pm))/i);
+                              if (!timeMatch) return;
+                              const [_, startTimeStr, endTimeStr] = timeMatch;
+
+                              const parseTime = (timeStr) => {
+                                let [hours, minutes] = timeStr.match(/\d+/g).map(Number);
+                                if (/pm/i.test(timeStr) && hours !== 12) hours += 12;
+                                if (/am/i.test(timeStr) && hours === 12) hours = 0;
+                                return { hours, minutes };
+                              };
+
+                              const startTime = parseTime(startTimeStr);
+                              const endTime = parseTime(endTimeStr);
+
+                              const startDate = new Date(eventDate);
+                              startDate.setHours(startTime.hours, startTime.minutes);
+
+                              const endDate = new Date(eventDate);
+                              endDate.setHours(endTime.hours, endTime.minutes);
+
+                              const formatDate = (d) => d.toISOString().replace(/-|:|\.\d{3}/g, '');
+
+                              const title = encodeURIComponent(`${block} - ${request.subject} with ${request.teacher_name}`);
+                              const details = encodeURIComponent(`Substitute assignment. Contact teacher at ${request.teacher_email}`);
+                              const location = encodeURIComponent(request.room);
+
+                              const calendarUrl = `https://calendar.google.com/calendar/r/eventedit?text=${title}&dates=${formatDate(startDate)}/${formatDate(endDate)}&details=${details}&location=${location}&add=${user.email}`;
+
+                              window.open(calendarUrl, '_blank');
+                            }}
+                          >
+                            {block}
+                          </Button>
+                        ))}
+                      </Box>
+                    </Td>
+
+                    <Td
+                      color={mainColor}
+                      cursor={request.notes ? 'pointer' : 'default'}
+                      textDecoration={request.notes ? 'underline' : 'none'}
+                      onClick={() => request.notes && openNotesDialog(request.notes)}
+                    >
+                      {request.notes ? 'View' : 'None'}
+                    </Td>
+
+                    <Td>
+                      <Button
+                        size="sm"
+                        colorScheme="red"
+                        onClick={() => openCancelDialog(request.id)}
+                      >
+                        Cancel
+                      </Button>
+                    </Td>
+                  </Tr>
+                );
+              })}
+            </Tbody>
+          </Table>
+        )}
+      </CardBody>
+    </Card>
+
+    {/* Cancel Assignment Dialog */}
+    <AlertDialog isOpen={isCancelOpen} onClose={closeCancelDialog} isCentered>
+      <AlertDialogOverlay>
+        <AlertDialogContent bg={inputBg}>
+          <AlertDialogHeader fontSize="lg" fontWeight="bold" color={mainColor}>
+            Cancel Assignment
+          </AlertDialogHeader>
+          <AlertDialogBody color={mainColor}>
+            Are you sure you want to cancel this assignment? This action cannot be undone.
+          </AlertDialogBody>
+          <AlertDialogFooter>
+            <Button onClick={closeCancelDialog} color={mainColor}>
+              No
+            </Button>
+            <Button
+              colorScheme="red"
+              onClick={() => handleCancel(cancelRequestId)}
+              ml={3}
+            >
+              Yes, Cancel
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialogOverlay>
+    </AlertDialog>
+
+    {/* Notes Dialog */}
+    <AlertDialog isOpen={!!selectedNotes} onClose={closeNotesDialog} isCentered>
+      <AlertDialogOverlay>
+        <AlertDialogContent bg={inputBg}>
+          <AlertDialogHeader fontSize="lg" fontWeight="bold" color={mainColor}>
+            Notes
+          </AlertDialogHeader>
+          <AlertDialogBody color={mainColor}>{selectedNotes}</AlertDialogBody>
+          <AlertDialogFooter>
+            <Button onClick={closeNotesDialog} color={mainColor}>
+              Close
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialogOverlay>
+    </AlertDialog>
+  </Box>
+);
+
+
+
+
 };
 
 export default SubstituteHome;
