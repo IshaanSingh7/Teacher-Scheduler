@@ -1,21 +1,15 @@
 // addEASubs.js
-require('dotenv').config({ path: './backend/.env' });
+// Adds EA substitutes into existing `users` table (assumes table/schema already created)
+require('dotenv').config();
 const mysql = require('mysql2/promise');
 
 async function addEASubs() {
   const connection = await mysql.createConnection({
-    host: process.env.DATABASE_HOST || 'localhost',
+    host: process.env.DATABASE_HOST,
     user: process.env.DATABASE_USER || 'sub_app',
     password: process.env.DATABASE_PASSWORD || 'ea1785ea',
     database: process.env.DATABASE_NAME || 'scheduling_app',
   });
-
-  // Add these columns if they don't exist yet
-  await connection.execute(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS phone VARCHAR(30),
-    ADD COLUMN IF NOT EXISTS departments VARCHAR(255)
-  `);
 
   const subs = [
     ['Brandon', 'Peaker', 'brandonpeaker@yahoo.com', '267-977-0886', 'Lower School, Middle School, Upper School, Other'],
@@ -46,21 +40,28 @@ async function addEASubs() {
 
   try {
     for (const [first, last, email, phone, departments] of subs) {
-      if (!email) continue; // skip missing emails
+      // skip entries without email (can't uniquely identify)
+      if (!email || email.trim() === '') {
+        console.log(`Skipped (no email): ${first} ${last}`);
+        continue;
+      }
+
       await connection.execute(
-        `INSERT INTO users (first_name, last_name, email, role, phone, departments)
+        `INSERT INTO users (first_name, last_name, email, role, phone_number, departments)
          VALUES (?, ?, ?, 'substitute', ?, ?)
-         ON DUPLICATE KEY UPDATE 
-           phone = VALUES(phone),
+         ON DUPLICATE KEY UPDATE
+           phone_number = VALUES(phone_number),
            departments = VALUES(departments),
            role = 'substitute'`,
         [first, last, email, phone, departments]
       );
-      console.log(`✅ Added/updated: ${first} ${last}`);
+
+      console.log(`Added/updated: ${first} ${last} <${email}>`);
     }
-    console.log('\n🎉 All EA substitutes successfully added/updated.');
+
+    console.log('All substitutes processed.');
   } catch (err) {
-    console.error('Error inserting subs:', err.message);
+    console.error('Error inserting subs:', err);
   } finally {
     await connection.end();
   }
