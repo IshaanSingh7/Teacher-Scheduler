@@ -83,7 +83,7 @@ const AdminAdd = () => {
 
     const fetchData = async () => {
       try {
-        const response = await fetch('http://localhost:3001/get-users');
+        const response = await fetch('/api/get-users');
         if (!response.ok) throw new Error('Failed to fetch data');
         const result = await response.json();
         setUsers(result);
@@ -125,7 +125,7 @@ const AdminAdd = () => {
     }
 
     try {
-      const url = isEditing ? `http://localhost:3001/update-user/${selectedUserId}` : 'http://localhost:3001/add-user';
+      const url = isEditing ? `/api/update-user/${selectedUserId}` : '/api/add-user';
       const method = isEditing ? 'PATCH' : 'POST';
 
       const response = await fetch(url, {
@@ -192,7 +192,7 @@ const AdminAdd = () => {
 
   const handleDeleteUser = async () => {
     try {
-      const response = await fetch(`http://localhost:3001/delete-user/${selectedUserId}`, {
+      const response = await fetch(`/api/delete-user/${selectedUserId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
       });

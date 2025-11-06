@@ -47,7 +47,7 @@ async function addEASubs() {
       }
 
       await connection.execute(
-        `INSERT INTO users (first_name, last_name, email, role, phone_number, departments)
+        `INSERT INTO Users (first_name, last_name, email, role, phone_number, departments)
          VALUES (?, ?, ?, 'substitute', ?, ?)
          ON DUPLICATE KEY UPDATE
            phone_number = VALUES(phone_number),

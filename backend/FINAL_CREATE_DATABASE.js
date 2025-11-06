@@ -1,5 +1,6 @@
 // setupDatabase.js
-require('dotenv').config({ path: './backend/.env' });
+// require('dotenv').config({ path: './backend/.env' });
+require('dotenv').config();
 const mysql = require('mysql2/promise');
 
 async function setupDatabase() {
@@ -15,7 +16,7 @@ async function setupDatabase() {
 
     // === USERS TABLE ===
     await connection.execute(`
-      CREATE TABLE IF NOT EXISTS users (
+      CREATE TABLE IF NOT EXISTS Users (
         id INT AUTO_INCREMENT PRIMARY KEY,
         first_name VARCHAR(50),
         last_name VARCHAR(50),
@@ -26,11 +27,11 @@ async function setupDatabase() {
         UNIQUE KEY unique_email (email)
       )
     `);
-    console.log('✅ Created users table.');
+    console.log('✅ Created Users table.');
 
     // --- Default user data ---
     await connection.execute(`
-      INSERT INTO users (first_name, last_name, email, role, departments, phone_number)
+      INSERT INTO Users (first_name, last_name, email, role, departments, phone_number)
       VALUES
         ('John', 'Doe', 'singi26+1@episcopalacademy.org', 'teacher', 'Upper School, Math', ''),
         ('Jane', 'Smith', 'singi26+2@episcopalacademy.org', 'teacher', 'Upper School, English', ''),
@@ -44,7 +45,7 @@ async function setupDatabase() {
 
     // === REQUESTS TABLE ===
     await connection.execute(`
-      CREATE TABLE IF NOT EXISTS requests (
+      CREATE TABLE IF NOT EXISTS Requests (
         id INT AUTO_INCREMENT PRIMARY KEY,
         teacher_id INT,
         blocks_requested VARCHAR(255),
@@ -57,7 +58,7 @@ async function setupDatabase() {
         FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
-    console.log('✅ Created requests table.');
+    console.log('✅ Created Requests table.');
 
     // === REQUEST_ASSIGNMENTS TABLE ===
     await connection.execute(`

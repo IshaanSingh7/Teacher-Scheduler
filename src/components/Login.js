@@ -34,7 +34,7 @@ const Login = () => {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:3001/login', {
+      const response = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -75,7 +75,7 @@ const Login = () => {
           <CardBody>
             <VStack spacing={8} align="stretch">
                 <Image
-                   src="http://localhost:3001/logo.png"
+                   src="/logo.png"
                    alt="School Logo"
                    maxH={{ base: '80px', sm: '100px' }}
                    mx="auto"

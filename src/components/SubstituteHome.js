@@ -1,225 +1,3 @@
-// import { useState, useEffect } from 'react';
-// import {
-//   Box,
-//   Card,
-//   CardBody,
-//   Heading,
-//   Table,
-//   Thead,
-//   Tbody,
-//   Tr,
-//   Th,
-//   Td,
-//   Text,
-//   useToast,
-//   Spinner,
-//   Button,
-//   AlertDialog,
-//   AlertDialogBody,
-//   AlertDialogFooter,
-//   AlertDialogHeader,
-//   AlertDialogContent,
-//   AlertDialogOverlay,
-// } from '@chakra-ui/react';
-// import { useNavigate } from 'react-router-dom';
-// import { useAuth } from '../AuthContext';
-
-// const SubstituteHome = () => {
-//   const [requests, setRequests] = useState([]);
-//   const [isLoading, setIsLoading] = useState(true);
-//   const [cancelRequestId, setCancelRequestId] = useState(null);
-//   const [isCancelOpen, setIsCancelOpen] = useState(false);
-//   const { user, isAuthenticated } = useAuth();
-//   const navigate = useNavigate();
-//   const toast = useToast();
-
-//   const mainColor = 'rgb(20, 54, 100)';
-//   const accentColor = 'rgb(175, 214, 241)';
-//   const bgColor = 'rgb(30, 64, 110)';
-//   const inputBg = '#FFFFFF';
-
-//   useEffect(() => {
-//     if (!isAuthenticated || user.role !== 'substitute') {
-//       navigate('/login');
-//       return;
-//     }
-
-//     const fetchRequests = async () => {
-//       try {
-//         const response = await fetch(`http://localhost:3001/substitute-requests?email=${encodeURIComponent(user.email)}`);
-//         if (response.ok) {
-//           const data = await response.json();
-//           setRequests(data);
-//         } else {
-//           throw new Error('Failed to fetch requests');
-//         }
-//       } catch (error) {
-//         console.error('Error fetching requests:', error);
-//         toast({
-//           title: 'Error',
-//           description: 'Failed to fetch requests.',
-//           status: 'error',
-//           duration: 5000,
-//           isClosable: true,
-//           bg: inputBg,
-//           color: mainColor,
-//         });
-//       } finally {
-//         setIsLoading(false);
-//       }
-//     };
-
-//     fetchRequests();
-//   }, [isAuthenticated, user, navigate, toast]);
-
-//   const handleCancel = async (requestId) => {
-//     try {
-//       const response = await fetch('http://localhost:3001/cancel-assignment', {
-//         method: 'POST',
-//         headers: { 'Content-Type': 'application/json' },
-//         body: JSON.stringify({ email: user.email, requestId }),
-//       });
-
-//       if (!response.ok) {
-//         const text = await response.text();
-//         console.error('Cancel response:', text);
-//         throw new Error(`Server responded with ${response.status}: ${text}`);
-//       }
-
-//       const data = await response.json();
-//       if (data.added) {
-//         setRequests(requests.filter(req => req.id !== requestId));
-//         toast({
-//           title: 'Success',
-//           description: 'Assignment canceled successfully.',
-//           status: 'success',
-//           duration: 5000,
-//           isClosable: true,
-//           bg: inputBg,
-//           color: mainColor,
-//         });
-//       } else {
-//         throw new Error(data.error || 'Failed to cancel assignment');
-//       }
-//     } catch (error) {
-//       console.error('Error canceling assignment:', error);
-//       toast({
-//         title: 'Error',
-//         description: error.message || 'Failed to cancel assignment.',
-//         status: 'error',
-//         duration: 5000,
-//         isClosable: true,
-//         bg: inputBg,
-//         color: mainColor,
-//       });
-//     }
-//     setIsCancelOpen(false);
-//     setCancelRequestId(null);
-//   };
-
-//   const openCancelDialog = (requestId) => {
-//     setCancelRequestId(requestId);
-//     setIsCancelOpen(true);
-//   };
-
-//   const closeCancelDialog = () => {
-//     setIsCancelOpen(false);
-//     setCancelRequestId(null);
-//   };
-
-//   if (isLoading) {
-//     return (
-//       <Box minH="100vh" display="flex" justifyContent="center" alignItems="center" bg={bgColor}>
-//         <Spinner size="xl" color={accentColor} />
-//       </Box>
-//     );
-//   }
-
-//   return (
-//     <Box minH="100vh" bg={bgColor} py={8} px={{ base: 4, md: 8 }}>
-//       <Heading size="lg" mb={6} color={inputBg} textAlign="center">
-//         Hello {user.first_name} {user.last_name}
-//       </Heading>
-//       <Card bg={inputBg} boxShadow="lg" borderRadius="lg">
-//         <CardBody>
-//           <Heading size="md" mb={4} color={mainColor}>
-//             Your Assigned Blocks
-//           </Heading>
-//           {requests.length === 0 ? (
-//             <Text color={mainColor}>No assigned blocks.</Text>
-//           ) : (
-//             <Table variant="simple" colorScheme="blue">
-//               <Thead>
-//                 <Tr>
-//                   <Th color={mainColor}>Teacher</Th>
-//                   <Th color={mainColor}>Day</Th>
-//                   <Th color={mainColor}>Subject</Th>
-//                   <Th color={mainColor}>Room</Th>
-//                   <Th color={mainColor}>Blocks</Th>
-//                   <Th color={mainColor}>Notes</Th>
-//                   <Th color={mainColor}>Action</Th>
-//                 </Tr>
-//               </Thead>
-//               <Tbody>
-//                 {requests.map(request => (
-//                   <Tr key={request.id}>
-//                     <Td color={mainColor}>{request.teacher_name}</Td>
-//                     <Td color={mainColor}>{request.day}</Td>
-//                     <Td color={mainColor}>{request.subject}</Td>
-//                     <Td color={mainColor}>{request.room}</Td>
-//                     <Td color={mainColor}>{request.blocks.join(', ')}</Td>
-//                     <Td color={mainColor}>{request.notes || 'None'}</Td>
-//                     <Td>
-//                       <Button
-//                         size="sm"
-//                         colorScheme="red"
-//                         onClick={() => openCancelDialog(request.id)}
-//                       >
-//                         Cancel
-//                       </Button>
-//                     </Td>
-//                   </Tr>
-//                 ))}
-//               </Tbody>
-//             </Table>
-//           )}
-//         </CardBody>
-//       </Card>
-
-//       <AlertDialog
-//         isOpen={isCancelOpen}
-//         onClose={closeCancelDialog}
-//         isCentered
-//       >
-//         <AlertDialogOverlay>
-//           <AlertDialogContent bg={inputBg}>
-//             <AlertDialogHeader fontSize="lg" fontWeight="bold" color={mainColor}>
-//               Cancel Assignment
-//             </AlertDialogHeader>
-//             <AlertDialogBody color={mainColor}>
-//               Are you sure you want to cancel this assignment? This action cannot be undone.
-//             </AlertDialogBody>
-//             <AlertDialogFooter>
-//               <Button onClick={closeCancelDialog} color={mainColor}>
-//                 No
-//               </Button>
-//               <Button
-//                 colorScheme="red"
-//                 onClick={() => handleCancel(cancelRequestId)}
-//                 ml={3}
-//               >
-//                 Yes, Cancel
-//               </Button>
-//             </AlertDialogFooter>
-//           </AlertDialogContent>
-//         </AlertDialogOverlay>
-//       </AlertDialog>
-//     </Box>
-//   );
-// };
-
-// export default SubstituteHome;
-
 import { useState, useEffect } from 'react';
 import {
   Box,
@@ -242,17 +20,23 @@ import {
   AlertDialogHeader,
   AlertDialogContent,
   AlertDialogOverlay,
+  VStack,
+  HStack,
+  Link,
+  Container,
+  SimpleGrid,
 } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 
 const SubstituteHome = () => {
-  const [requests, setRequests] = useState([]);
+  const [assignedRequests, setAssignedRequests] = useState([]);
+  const [openRequests, setOpenRequests] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [cancelRequestId, setCancelRequestId] = useState(null);
   const [isCancelOpen, setIsCancelOpen] = useState(false);
   const [selectedNotes, setSelectedNotes] = useState(null);
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -267,20 +51,22 @@ const SubstituteHome = () => {
       return;
     }
 
-    const fetchRequests = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch(`http://localhost:3001/substitute-requests?email=${encodeURIComponent(user.email)}`);
-        if (response.ok) {
-          const data = await response.json();
-          setRequests(data);
-        } else {
-          throw new Error('Failed to fetch requests');
-        }
-      } catch (error) {
-        console.error('Error fetching requests:', error);
+        // Assigned
+        const assignedRes = await fetch(`/api/substitute-requests?email=${encodeURIComponent(user.email)}`);
+        const assigned = assignedRes.ok ? await assignedRes.json() : [];
+
+        // Open (all uncompleted, regardless of block status)
+        const openRes = await fetch(`/api/sub-open-requests?subEmail=${encodeURIComponent(user.email)}`);
+        const open = openRes.ok ? await openRes.json() : [];
+
+        setAssignedRequests(assigned);
+        setOpenRequests(open);
+      } catch (err) {
         toast({
           title: 'Error',
-          description: 'Failed to fetch requests.',
+          description: 'Failed to load data.',
           status: 'error',
           duration: 5000,
           isClosable: true,
@@ -292,77 +78,46 @@ const SubstituteHome = () => {
       }
     };
 
-    fetchRequests();
+    fetchData();
   }, [isAuthenticated, user, navigate, toast]);
 
   const handleCancel = async (requestId) => {
     try {
-      const response = await fetch('http://localhost:3001/cancel-assignment', {
+      const response = await fetch('/api/cancel-assignment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: user.email, requestId }),
       });
 
-      if (!response.ok) {
-        const text = await response.text();
-        console.error('Cancel response:', text);
-        throw new Error(`Server responded with ${response.status}: ${text}`);
-      }
+      if (!response.ok) throw new Error(await response.text());
 
       const data = await response.json();
       if (data.added) {
-        setRequests(requests.filter(req => req.id !== requestId));
-        toast({
-          title: 'Success',
-          description: 'Assignment canceled successfully.',
-          status: 'success',
-          duration: 5000,
-          isClosable: true,
-          bg: inputBg,
-          color: mainColor,
-        });
-      } else {
-        throw new Error(data.error || 'Failed to cancel assignment');
+        setAssignedRequests((prev) => prev.filter((r) => r.id !== requestId));
+        toast({ title: 'Success', description: 'Assignment canceled.', status: 'success', duration: 5000, isClosable: true, bg: inputBg, color: mainColor });
       }
     } catch (error) {
-      console.error('Error canceling assignment:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to cancel assignment.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-        bg: inputBg,
-        color: mainColor,
-      });
+      toast({ title: 'Error', description: error.message || 'Failed to cancel.', status: 'error', duration: 5000, isClosable: true, bg: inputBg, color: mainColor });
     }
     setIsCancelOpen(false);
     setCancelRequestId(null);
   };
 
-  const openCancelDialog = (requestId) => {
-    setCancelRequestId(requestId);
+  const openCancelDialog = (id) => {
+    setCancelRequestId(id);
     setIsCancelOpen(true);
   };
-
   const closeCancelDialog = () => {
     setIsCancelOpen(false);
     setCancelRequestId(null);
   };
 
-  const openNotesDialog = (notes) => {
-    setSelectedNotes(notes || 'No notes provided.');
-  };
+  const openNotesDialog = (notes) => setSelectedNotes(notes || 'None');
+  const closeNotesDialog = () => setSelectedNotes(null);
 
-  const closeNotesDialog = () => {
-    setSelectedNotes(null);
-  };
-
-  const getBlockNumber = (block) => {
-    if (!block) return 999;
-    const firstChar = block.trim()[0];
-    const num = parseInt(firstChar, 10);
-    return isNaN(num) ? 999 : num;
+  const getBlockNumber = (b) => {
+    const n = parseInt(b.trim()[0], 10);
+    return isNaN(n) ? 999 : n;
   };
 
   if (isLoading) {
@@ -372,198 +127,215 @@ const SubstituteHome = () => {
       </Box>
     );
   }
-return (
-  <Box minH="100vh" bg={bgColor} py={8} px={{ base: 4, md: 8 }}>
-    <Heading size="lg" mb={6} color={inputBg} textAlign="center">
-      Hello {user.first_name} {user.last_name}
-    </Heading>
-    <Card bg={inputBg} boxShadow="lg" borderRadius="lg">
-      <CardBody>
-        <Heading size="md" mb={4} color={mainColor}>
-          Your Assigned Blocks
-        </Heading>
-        {requests.length === 0 ? (
-          <Text color={mainColor}>No assigned blocks.</Text>
-        ) : (
-          <Table variant="simple" colorScheme="blue">
-            <Thead>
-              <Tr>
-                <Th color={mainColor}>Teacher</Th>
-                <Th color={mainColor}>Day</Th>
-                <Th color={mainColor}>Subject</Th>
-                <Th color={mainColor}>Room</Th>
-                <Th color={mainColor}>Blocks</Th>
-                <Th color={mainColor}>Notes</Th>
-                <Th color={mainColor}>Action</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {requests.map((request) => {
-                const formattedDay = request.day
-                  ? new Date(request.day).toLocaleDateString('en-US', {
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })
-                  : '';
 
-                const sortedBlocks = [...request.blocks].sort((a, b) => {
-                  const numA = parseInt(a[0], 10);
-                  const numB = parseInt(b[0], 10);
-                  return numA - numB;
-                });
+  return (
+    <Box minH="100vh" bg={bgColor} py={8} px={{ base: 4, md: 8 }}>
+      <Container maxW="container.xl">
+        {/* Header + Logout */}
+        <HStack justify="space-between" mb={6} align="center" flexWrap="wrap">
+          <Heading size="lg" color={inputBg}>
+            Hello {user.first_name} {user.last_name}
+          </Heading>
+          <Button
+            bg={inputBg}
+            color={mainColor}
+            borderWidth={1}
+            borderColor={mainColor}
+            _hover={{ bg: accentColor, color: mainColor }}
+            onClick={logout}
+          >
+            Logout
+          </Button>
+        </HStack>
 
-                return (
-                  <Tr key={request.id}>
-                    {/* Teacher name as copy-to-clipboard button */}
-                    <Td color={mainColor}>
-                      <Button
-                        size="sm"
-                        variant="link"
-                        colorScheme="blue"
-                        onClick={() => {
-                          navigator.clipboard.writeText(request.teacher_email);
-                          toast({
-                            title: 'Copied',
-                            description: `Copied ${request.teacher_email} to clipboard`,
-                            status: 'success',
-                            duration: 3000,
-                            isClosable: true,
-                            bg: inputBg,
-                            color: mainColor,
-                          });
-                        }}
-                      >
-                        {request.teacher_name}
-                      </Button>
-                    </Td>
+        {/* Assigned Blocks */}
+        <Card bg={inputBg} boxShadow="lg" borderRadius="lg" mb={8}>
+          <CardBody>
+            <Heading size="md" mb={4} color={mainColor}>
+              Your Assigned Blocks
+            </Heading>
+            {assignedRequests.length === 0 ? (
+              <Text color={mainColor}>No assigned blocks.</Text>
+            ) : (
+              <Table variant="simple" colorScheme="blue">
+                <Thead>
+                  <Tr>
+                    <Th color={mainColor}>Teacher</Th>
+                    <Th color={mainColor}>Day</Th>
+                    <Th color={mainColor}>Subject</Th>
+                    <Th color={mainColor}>Room</Th>
+                    <Th color={mainColor}>Blocks</Th>
+                    <Th color={mainColor}>Notes</Th>
+                    <Th color={mainColor}>Action</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {assignedRequests.map((request) => {
+                    const formattedDay = request.day
+                      ? new Date(request.day).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                      : '';
 
-                    <Td color={mainColor}>{formattedDay}</Td>
-                    <Td color={mainColor}>{request.subject}</Td>
-                    <Td color={mainColor}>{request.room}</Td>
+                    const sortedBlocks = [...request.blocks].sort((a, b) => getBlockNumber(a) - getBlockNumber(b));
 
-                    {/* Blocks: individual buttons for each block */}
-                    <Td color={mainColor}>
-                      <Box display="flex" flexDirection="column" gap={2}>
-                        {sortedBlocks.map((block, i) => (
+                    return (
+                      <Tr key={request.id}>
+                        <Td color={mainColor}>
                           <Button
-                            key={i}
                             size="sm"
+                            variant="link"
                             colorScheme="blue"
                             onClick={() => {
-                              const eventDate = new Date(request.day);
-                              const timeMatch = block.match(/(\d{1,2}:\d{2}(?:am|pm))-(\d{1,2}:\d{2}(?:am|pm))/i);
-                              if (!timeMatch) return;
-                              const [_, startTimeStr, endTimeStr] = timeMatch;
-
-                              const parseTime = (timeStr) => {
-                                let [hours, minutes] = timeStr.match(/\d+/g).map(Number);
-                                if (/pm/i.test(timeStr) && hours !== 12) hours += 12;
-                                if (/am/i.test(timeStr) && hours === 12) hours = 0;
-                                return { hours, minutes };
-                              };
-
-                              const startTime = parseTime(startTimeStr);
-                              const endTime = parseTime(endTimeStr);
-
-                              const startDate = new Date(eventDate);
-                              startDate.setHours(startTime.hours, startTime.minutes);
-
-                              const endDate = new Date(eventDate);
-                              endDate.setHours(endTime.hours, endTime.minutes);
-
-                              const formatDate = (d) => d.toISOString().replace(/-|:|\.\d{3}/g, '');
-
-                              const title = encodeURIComponent(`${block} - ${request.subject} with ${request.teacher_name}`);
-                              const details = encodeURIComponent(`Substitute assignment. Contact teacher at ${request.teacher_email}`);
-                              const location = encodeURIComponent(request.room);
-
-                              const calendarUrl = `https://calendar.google.com/calendar/r/eventedit?text=${title}&dates=${formatDate(startDate)}/${formatDate(endDate)}&details=${details}&location=${location}&add=${user.email}`;
-
-                              window.open(calendarUrl, '_blank');
+                              navigator.clipboard.writeText(request.teacher_email);
+                              toast({ title: 'Copied', description: `Copied ${request.teacher_email}`, status: 'success', duration: 3000, isClosable: true, bg: inputBg, color: mainColor });
                             }}
                           >
-                            {block}
+                            {request.teacher_name}
                           </Button>
+                        </Td>
+                        <Td color={mainColor}>{formattedDay}</Td>
+                        <Td color={mainColor}>{request.subject}</Td>
+                        <Td color={mainColor}>{request.room}</Td>
+                        <Td color={mainColor}>
+                          <VStack align="start" spacing={1}>
+                            {sortedBlocks.map((block, i) => (
+                              <Button
+                                key={i}
+                                size="xs"
+                                colorScheme="blue"
+                                onClick={() => {
+                                  const eventDate = new Date(request.day);
+                                  const timeMatch = block.match(/(\d{1,2}:\d{2}(?:am|pm))-(\d{1,2}:\d{2}(?:am|pm))/i);
+                                  if (!timeMatch) return;
+                                  const [_, startStr, endStr] = timeMatch;
+
+                                  const parse = (t) => {
+                                    let [h, m] = t.match(/\d+/g).map(Number);
+                                    if (/pm/i.test(t) && h !== 12) h += 12;
+                                    if (/am/i.test(t) && h === 12) h = 0;
+                                    return { h, m };
+                                  };
+
+                                  const start = parse(startStr);
+                                  const end = parse(endStr);
+                                  const sd = new Date(eventDate);
+                                  sd.setHours(start.h, start.m);
+                                  const ed = new Date(eventDate);
+                                  ed.setHours(end.h, end.m);
+
+                                  const fmt = (d) => d.toISOString().replace(/[-:]/g, '').split('.')[0];
+                                  const title = encodeURIComponent(`${block} - ${request.subject} with ${request.teacher_name}`);
+                                  const details = encodeURIComponent(`Substitute assignment. Contact: ${request.teacher_email}`);
+                                  const loc = encodeURIComponent(request.room);
+                                  const url = `https://calendar.google.com/calendar/r/eventedit?text=${title}&dates=${fmt(sd)}/${fmt(ed)}&details=${details}&location=${loc}&add=${user.email}`;
+                                  window.open(url, '_blank');
+                                }}
+                              >
+                                {block}
+                              </Button>
+                            ))}
+                          </VStack>
+                        </Td>
+                        <Td
+                          color={mainColor}
+                          cursor={request.notes ? 'pointer' : 'default'}
+                          textDecoration={request.notes ? 'underline' : 'none'}
+                          onClick={() => request.notes && openNotesDialog(request.notes)}
+                        >
+                          {request.notes ? 'View' : 'None'}
+                        </Td>
+                        <Td>
+                          <Button size="sm" colorScheme="red" onClick={() => openCancelDialog(request.id)}>
+                            Cancel
+                          </Button>
+                        </Td>
+                      </Tr>
+                    );
+                  })}
+                </Tbody>
+              </Table>
+            )}
+          </CardBody>
+        </Card>
+
+        {/* Open Requests Section */}
+        <Heading size="md" mb={4} color={inputBg}>
+          Open Substitute Requests
+        </Heading>
+        {openRequests.length === 0 ? (
+          <Text color={inputBg}>No open requests at this time.</Text>
+        ) : (
+          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
+            {openRequests.map((req) => {
+              const sorted = [...req.blocks].sort((a, b) => getBlockNumber(a.block) - getBlockNumber(b.block));
+              return (
+                <Card key={req.id} bg={inputBg} boxShadow="md" borderRadius="lg">
+                  <CardBody>
+                    <VStack align="start" spacing={2}>
+                      <Text fontWeight="bold" color={mainColor}>
+                        {req.teacher_name} – {req.subject} (Room {req.room})
+                      </Text>
+                      <Text fontSize="sm" color={mainColor}>
+                        {new Date(req.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </Text>
+                      <VStack align="start" spacing={1} w="full">
+                        {sorted.map((b) => (
+                          <HStack key={b.block} justify="space-between" w="full">
+                            <Text
+                              fontSize="sm"
+                              color={b.assigned ? 'red.600' : 'green.600'}
+                              fontWeight={b.assigned ? 'normal' : 'bold'}
+                            >
+                              {b.block} {b.assigned ? '(Taken)' : '(Open)'}
+                            </Text>
+                            {!b.assigned && b.signup_link && (
+                              <Link href={b.signup_link} color="blue.600" fontSize="sm" isExternal>
+                                Sign Up
+                              </Link>
+                            )}
+                          </HStack>
                         ))}
-                      </Box>
-                    </Td>
-
-                    <Td
-                      color={mainColor}
-                      cursor={request.notes ? 'pointer' : 'default'}
-                      textDecoration={request.notes ? 'underline' : 'none'}
-                      onClick={() => request.notes && openNotesDialog(request.notes)}
-                    >
-                      {request.notes ? 'View' : 'None'}
-                    </Td>
-
-                    <Td>
-                      <Button
-                        size="sm"
-                        colorScheme="red"
-                        onClick={() => openCancelDialog(request.id)}
-                      >
-                        Cancel
-                      </Button>
-                    </Td>
-                  </Tr>
-                );
-              })}
-            </Tbody>
-          </Table>
+                      </VStack>
+                      {req.notes && (
+                        <Text fontSize="xs" color="gray.600" mt={2}>
+                          Notes: {req.notes}
+                        </Text>
+                      )}
+                    </VStack>
+                  </CardBody>
+                </Card>
+              );
+            })}
+          </SimpleGrid>
         )}
-      </CardBody>
-    </Card>
 
-    {/* Cancel Assignment Dialog */}
-    <AlertDialog isOpen={isCancelOpen} onClose={closeCancelDialog} isCentered>
-      <AlertDialogOverlay>
-        <AlertDialogContent bg={inputBg}>
-          <AlertDialogHeader fontSize="lg" fontWeight="bold" color={mainColor}>
-            Cancel Assignment
-          </AlertDialogHeader>
-          <AlertDialogBody color={mainColor}>
-            Are you sure you want to cancel this assignment? This action cannot be undone.
-          </AlertDialogBody>
-          <AlertDialogFooter>
-            <Button onClick={closeCancelDialog} color={mainColor}>
-              No
-            </Button>
-            <Button
-              colorScheme="red"
-              onClick={() => handleCancel(cancelRequestId)}
-              ml={3}
-            >
-              Yes, Cancel
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialogOverlay>
-    </AlertDialog>
+        {/* Dialogs */}
+        <AlertDialog isOpen={isCancelOpen} onClose={closeCancelDialog} isCentered>
+          <AlertDialogOverlay>
+            <AlertDialogContent bg={inputBg}>
+              <AlertDialogHeader fontSize="lg" fontWeight="bold" color={mainColor}>Cancel Assignment</AlertDialogHeader>
+              <AlertDialogBody color={mainColor}>Are you sure? This cannot be undone.</AlertDialogBody>
+              <AlertDialogFooter>
+                <Button onClick={closeCancelDialog} color={mainColor}>No</Button>
+                <Button colorScheme="red" onClick={() => handleCancel(cancelRequestId)} ml={3}>Yes, Cancel</Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialogOverlay>
+        </AlertDialog>
 
-    {/* Notes Dialog */}
-    <AlertDialog isOpen={!!selectedNotes} onClose={closeNotesDialog} isCentered>
-      <AlertDialogOverlay>
-        <AlertDialogContent bg={inputBg}>
-          <AlertDialogHeader fontSize="lg" fontWeight="bold" color={mainColor}>
-            Notes
-          </AlertDialogHeader>
-          <AlertDialogBody color={mainColor}>{selectedNotes}</AlertDialogBody>
-          <AlertDialogFooter>
-            <Button onClick={closeNotesDialog} color={mainColor}>
-              Close
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialogOverlay>
-    </AlertDialog>
-  </Box>
-);
-
-
-
-
+        <AlertDialog isOpen={!!selectedNotes} onClose={closeNotesDialog} isCentered>
+          <AlertDialogOverlay>
+            <AlertDialogContent bg={inputBg}>
+              <AlertDialogHeader fontSize="lg" fontWeight="bold" color={mainColor}>Notes</AlertDialogHeader>
+              <AlertDialogBody color={mainColor}>{selectedNotes}</AlertDialogBody>
+              <AlertDialogFooter>
+                <Button onClick={closeNotesDialog} color={mainColor}>Close</Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialogOverlay>
+        </AlertDialog>
+      </Container>
+    </Box>
+  );
 };
 
 export default SubstituteHome;

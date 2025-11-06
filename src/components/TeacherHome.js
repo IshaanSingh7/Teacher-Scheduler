@@ -74,7 +74,7 @@ const TeacherHome = () => {
     const fetchData = async () => {
       try {
         const response = await fetch(
-          `http://localhost:3001/teacher-requests?email=${encodeURIComponent(
+          `/api/teacher-requests?email=${encodeURIComponent(
             user.email
           )}`,
           {
@@ -119,7 +119,7 @@ const TeacherHome = () => {
     try {
       const endpoint =
         type === 'complete' ? '/complete-request' : '/cancel-request';
-      const response = await fetch(`http://localhost:3001${endpoint}`, {
+      const response = await fetch(`/api${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: user.email, requestId }),

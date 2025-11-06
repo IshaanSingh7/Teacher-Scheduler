@@ -97,7 +97,7 @@ const TeacherScheduler = () => {
   useEffect(() => {
     const fetchSubstitutes = async () => {
       try {
-        const response = await fetch('http://localhost:3001/get-subs');
+        const response = await fetch('/api/get-subs');
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         const result = await response.json();
         const processedSubstitutes = result.map(sub => ({
@@ -230,7 +230,7 @@ const TeacherScheduler = () => {
     };
 
     try {
-      const response = await fetch('http://localhost:3001/send-substitute-email', {
+      const response = await fetch('/api/send-substitute-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

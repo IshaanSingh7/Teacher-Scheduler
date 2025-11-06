@@ -17,10 +17,7 @@ const port = 3001;
 app.use(express.json());
 app.use(cors());
 
-// Serve static files from the 'public' directory
-app.use(express.static('public'));
 const connection = mysql.createConnection({
-
   host: process.env.DATABASE_HOST,
   user: process.env.DATABASE_USER,
   password: process.env.DATABASE_PASSWORD,
@@ -54,7 +51,7 @@ transporter.verify((error, success) => {
 
 
 
-app.get('/getting-requests', (req, res) => {
+app.get('/api/getting-requests', (req, res) => {
   const { teacherId } = req.query;  // Use 'id' as the query parameter
   console.log("Teacher ID received:", teacherId);
 
@@ -64,7 +61,7 @@ app.get('/getting-requests', (req, res) => {
 
   const requestQuery = `
     SELECT r.id, r.blocks_requested, r.subject, r.room, r.day, r.subs, r.notes, r.sent
-    FROM requests r
+    FROM Requests r
     WHERE r.teacher_id = ?
   `;
 
@@ -95,7 +92,7 @@ app.get('/getting-requests', (req, res) => {
   });
 });
 
-app.get('/open-or-taken', async (req, res) => {
+app.get('/api/open-or-taken', async (req, res) => {
   const { requestId } = req.query;
 
   if (!requestId) {
@@ -123,7 +120,7 @@ app.get('/open-or-taken', async (req, res) => {
           ),
           '[]'
         ) AS assignments
-      FROM requests r
+      FROM Requests r
       JOIN Users t ON r.teacher_id = t.id
       WHERE r.id = ? AND r.status != 'completed'
     `;
@@ -167,7 +164,7 @@ app.get('/open-or-taken', async (req, res) => {
   }
 });
 
-app.post('/verify-token', (req, res) => {
+app.post('/api/verify-token', (req, res) => {
   // Extract token from the 'Authorization' header
   const token = req.headers['authorization']?.split(' ')[1]; // Bearer <token>
 
@@ -194,7 +191,10 @@ app.post('/verify-token', (req, res) => {
   });
 });
 
-app.post('/login', async (req, res) => {
+
+
+
+app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -239,27 +239,8 @@ app.post('/login', async (req, res) => {
   });
 });
 
-app.post('/verify-token', (req, res) => {
-  const token = req.headers['authorization']?.split(' ')[1];
-  if (!token) {
-    return res.status(401).json({ error: 'No token provided' });
-  }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-    if (err) {
-      return res.status(401).json({ error: 'Invalid or expired token' });
-    }
-    return res.json({
-      user: {
-        id: decoded.id,
-        role: decoded.role,
-        email: decoded.email,
-      },
-    });
-  });
-});
-
-app.get('/substitute-email', async (req, res) => {
+app.get('/api/substitute-email', async (req, res) => {
   const { first_name, last_name } = req.query;
 
   if (!first_name || !last_name) {
@@ -283,7 +264,7 @@ app.get('/substitute-email', async (req, res) => {
   }
 });
 
-app.post('/send-substitute-email', (req, res) => {
+app.post('/api/send-substitute-email', (req, res) => {
   transporter.verify((error, success) => {
     if (error) {
       console.error('Error configuring transporter:', error);
@@ -329,7 +310,7 @@ app.post('/send-substitute-email', (req, res) => {
         const subEmailsString = emailRecipients.map(item => item.email).join(',') || null;
 
         const insertRequestQuery = `
-          INSERT INTO requests (teacher_id, blocks_requested, subject, room, day, notes, sent)
+          INSERT INTO Requests (teacher_id, blocks_requested, subject, room, day, notes, sent)
           VALUES (?, ?, ?, ?, ?, ?, ?)
         `;
         const insertValues = [
@@ -354,7 +335,8 @@ app.post('/send-substitute-email', (req, res) => {
             const emailPromises = emailRecipients.map((sub) => {
               const acceptToken = jwt.sign({ email: sub.email, requestId }, process.env.JWT_SECRET, { expiresIn: '1y' });
 
-              const link = `http://localhost:3000/LinkLogin?token=${acceptToken}&requestId=${requestId}`;
+              const FRONTEND_URL = process.env.FRONTEND_URL;
+              const link = `${FRONTEND_URL}/LinkLogin?token=${acceptToken}&requestId=${requestId}`;
               const emailSubject = `Substitute Request for ${firstName} ${lastName}`;
               const emailBody = `
              <html lang="en">
@@ -436,7 +418,7 @@ app.post('/send-substitute-email', (req, res) => {
 
           function finalizeRequest() {
             const updateRequestQuery = `
-              UPDATE requests
+              UPDATE Requests
               SET sent = ?
               WHERE id = ?
             `;
@@ -445,7 +427,7 @@ app.post('/send-substitute-email', (req, res) => {
                 console.error('Error updating request:', err);
                 return res.status(500).json({ error: 'Database error updating request' });
               }
-              res.json({ message: 'Request processed successfully'});
+              res.json({ message: 'Request processed successfully' });
             });
           }
         });
@@ -455,7 +437,64 @@ app.post('/send-substitute-email', (req, res) => {
 });
 
 
-app.get('/teacher-requests', async (req, res) => {
+
+
+// app.get('/api/sub-open-requests', async (req, res) => {
+//   const { subEmail } = req.query;
+
+//   if (!subEmail) return res.status(400).json({ error: 'subEmail required' });
+
+//   try {
+//     const [rows] = await connection.execute(`
+//       SELECT 
+//         r.id, r.teacher_name, r.subject, r.room, r.day, r.notes,
+//         JSON_ARRAYAGG(
+//           JSON_OBJECT('block', b.block, 'assigned', b.assigned)
+//         ) AS blocks
+//       FROM requests r
+//       JOIN request_blocks b ON r.id = b.request_id
+//       WHERE r.status != 'completed'
+//       GROUP BY r.id
+//     `);
+
+//     const requests = rows.map(row => {
+//       const blocks = JSON.parse(row.blocks).map(b => ({
+//         block: b.block,
+//         assigned: b.assigned,
+//         signup_link: b.assigned
+//           ? null
+//           : `${process.env.FRONTEND_URL}/LinkLogin?token=${jwt.sign(
+//             { email: subEmail, requestId: row.id, block: b.block },
+//             process.env.JWT_SECRET,
+//             { expiresIn: '1y' }
+//           )}&requestId=${row.id}`
+//       }));
+
+//       return {
+//         id: row.id,
+//         teacher_name: row.teacher_name,
+//         subject: row.subject,
+//         room: row.room,
+//         day: row.day,
+//         notes: row.notes,
+//         blocks
+//       };
+//     });
+
+//     res.json(requests); // ← No filtering
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: 'Server error' });
+//   }
+// });
+
+// test below
+// app.get(' http://31.97.141.212:/api/sub-open-requests', async (req, res) => {
+//   res.json([{ test: 'Open requests endpoint works' }]);
+// });
+
+
+app.get('/api/teacher-requests', async (req, res) => {
   const { email } = req.query;
 
   if (!email) {
@@ -475,7 +514,7 @@ app.get('/teacher-requests', async (req, res) => {
       SELECT 
         r.id, r.day, r.subject, r.room, r.notes,
         r.blocks_requested
-      FROM requests r
+      FROM Requests r
       WHERE r.teacher_id = ? AND r.status != 'completed'
     `;
     const [requestResults] = await connection.promise().query(query, [teacherId]);
@@ -484,7 +523,7 @@ app.get('/teacher-requests', async (req, res) => {
     const formattedResults = await Promise.all(
       requestResults.map(async request => {
         const blocksRequested = request.blocks_requested ? request.blocks_requested.split(',').map(b => b.trim()) : [];
-        
+
         // Fetch assigned blocks, substitute names, and emails
         const [assignmentResults] = await connection.promise().query(
           `
@@ -527,7 +566,7 @@ app.get('/teacher-requests', async (req, res) => {
   }
 });
 
-app.post('/complete-request', async (req, res) => {
+app.post('/api/complete-request', async (req, res) => {
   const { email, requestId } = req.body;
 
   if (!email || !requestId) {
@@ -544,7 +583,7 @@ app.post('/complete-request', async (req, res) => {
 
     // Verify request belongs to teacher and is not completed
     const [requestResults] = await connection.promise().query(
-      'SELECT id FROM requests WHERE id = ? AND teacher_id = ? AND status != ?',
+      'SELECT id FROM Requests WHERE id = ? AND teacher_id = ? AND status != ?',
       [requestId, teacherId, 'completed']
     );
     if (requestResults.length === 0) {
@@ -553,7 +592,7 @@ app.post('/complete-request', async (req, res) => {
 
     // Update request status to completed
     await connection.promise().query(
-      'UPDATE requests SET status = ? WHERE id = ?',
+      'UPDATE Requests SET status = ? WHERE id = ?',
       ['completed', requestId]
     );
 
@@ -564,159 +603,121 @@ app.post('/complete-request', async (req, res) => {
   }
 });
 
-app.post('/cancel-request', async (req, res) => {
-  const { email, requestId } = req.body;
 
-  if (!email || !requestId) {
-    return res.status(400).json({ error: 'Email and requestId are required' });
-  }
+app.post('/api/cancel-request', async (req, res) => {
+  const { email, requestId } = req.body;
+  if (!email || !requestId) return res.status(400).json({ error: 'Email and requestId are required' });
 
   try {
-    // Verify transporter configuration
-    try {
-      await transporter.verify();
-      console.log('SMTP transporter verified successfully');
-    } catch (err) {
-      console.error('SMTP configuration error:', err);
-      return res.status(500).json({ error: 'Email service configuration error: Invalid credentials' });
-    }
+    await transporter.verify();
 
-    // Fetch teacher ID
     const [userResults] = await connection.promise().query('SELECT id FROM Users WHERE email = ?', [email]);
-    if (userResults.length === 0) {
-      return res.status(404).json({ error: 'Teacher not found' });
-    }
+    if (!userResults.length) return res.status(404).json({ error: 'Teacher not found' });
     const teacherId = userResults[0].id;
 
-    // Fetch request details, including sent column
     const [requestResults] = await connection.promise().query(
-      `
-      SELECT r.blocks_requested, r.subject, r.room, r.day, r.notes, r.sent,
-             t.first_name AS teacher_first_name, t.last_name AS teacher_last_name
-      FROM requests r
-      JOIN Users t ON r.teacher_id = t.id
-      WHERE r.id = ? AND r.teacher_id = ? AND r.status != 'completed'
-      `,
+      `SELECT r.blocks_requested, r.subject, r.room, r.day, r.notes, r.sent,
+              t.first_name AS teacher_first_name, t.last_name AS teacher_last_name
+       FROM Requests r
+       JOIN Users t ON r.teacher_id = t.id
+       WHERE r.id = ? AND r.teacher_id = ? AND r.status != 'completed'`,
       [requestId, teacherId]
     );
-    if (requestResults.length === 0) {
-      return res.status(404).json({ error: 'Request not found or already completed' });
-    }
+    if (!requestResults.length) return res.status(404).json({ error: 'Request not found or already completed' });
 
     const request = requestResults[0];
     const teacherName = `${request.teacher_first_name} ${request.teacher_last_name}`;
+    const sentEmails = request.sent ? [...new Set(request.sent.split(',').map(e => e.trim()))] : [];
 
-    // Parse unique substitute emails from sent column
-    const substituteEmails = request.sent
-      ? [...new Set(request.sent.split(',').map(email => email.trim()))]
-      : [];
-    
-    // Fetch assigned blocks for email content
-    const [assignmentResults] = await connection.promise().query(
-      `
-      SELECT ra.block
-      FROM request_assignments ra
-      WHERE ra.request_id = ?
-      `,
+    const [assignments] = await connection.promise().query(
+      `SELECT ra.block, u.email, u.first_name, u.last_name
+       FROM request_assignments ra
+       JOIN Users u ON ra.sub_id = u.id
+       WHERE ra.request_id = ?`,
       [requestId]
     );
-    const canceledBlocks = assignmentResults.map(a => a.block);
 
-    // Prepare email content
-    const subject = `Substitution Request #${requestId} Canceled`;
-    const html = `
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Request Canceled Notification</title>
-      </head>
-      <body style="background-color: #f4f4f4; margin: 0; padding: 20px; font-family: Arial, sans-serif;">
-        <table align="center" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
-          <tr>
-            <td style="background-color: rgb(20, 54, 100); padding: 20px; text-align: center;">
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 30px;">
-              <h2 style="color: rgb(20, 54, 100); margin: 0 0 20px; font-size: 24px;">Substitution Request Canceled</h2>
-              <p style="color: #333333; font-size: 16px; line-height: 1.5; margin: 0 0 20px;">
-                The following substitution request by <strong>${teacherName}</strong> has been canceled.
-              </p>
-              <table cellpadding="10" cellspacing="0" width="100%" style="border-collapse: collapse; font-size: 16px; color: #333333;">
-                <tr>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Blocks:</strong></td>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;">${canceledBlocks.join(', ') || request.blocks_requested || '-'}</td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Subject:</strong></td>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;">${request.subject || '-'}</td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Room:</strong></td>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;">${request.room || '-'}</td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Date:</strong></td>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;">${request.day || '-'}</td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Notes:</strong></td>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;">${request.notes || 'None'}</td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color: rgb(30, 64, 110); color: #ffffff; padding: 15px; text-align: center; font-size: 14px;">
-              <p style="margin: 0;">Substitute Scheduler | The Episcopal Academy</p>
-              <p style="margin: 5px 0;">1785 Bishop White Drive, Newtown Square, PA 19073</p>
-            </td>
-          </tr>
-        </table>
-      </body>
-      </html>
-    `;
-    const text = `
-      Substitution Request Canceled
-      
-      The following request #${requestId} by ${teacherName} has been canceled:
-      
-      Blocks: ${canceledBlocks.join(', ') || request.blocks_requested || '-'}
-      Subject: ${request.subject || '-'}
-      Room: ${request.room || '-'}
-      Date: ${request.day || '-'}
-      Notes: ${request.notes || 'None'}
-    `;
+    const assignedSubEmails = [...new Set(assignments.map(a => a.email))];
+    const notAssignedEmails = sentEmails.filter(e => !assignedSubEmails.includes(e));
 
-    // Send emails to unique substitutes from sent column
-    if (substituteEmails.length > 0) {
-      console.log(`Sending cancellation emails to: ${substituteEmails.join(', ')}`);
-      try {
-        await Promise.all(
-          substituteEmails.map(async (recipient) => {
-            const info = await transporter.sendMail({
-              from: `"Substitute Scheduler" <${process.env.EMAIL_USER}>`,
-              to: recipient,
-              subject,
-              text,
-              html,
-            });
-            console.log(`Email sent to ${recipient}: Message ID ${info.messageId}`);
-            return info;
-          })
-        );
-      } catch (err) {
-        console.error('Error sending emails:', err);
-        return res.status(500).json({ error: `Failed to send emails: ${err.message}` });
-      }
-    } else {
-      console.log('No substitutes to notify for request', requestId);
+    await connection.promise().query('DELETE FROM request_assignments WHERE request_id = ?', [requestId]);
+    await connection.promise().query('DELETE FROM Requests WHERE id = ?', [requestId]);
+
+    if (notAssignedEmails.length) {
+      const basicHtml = `
+      <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="background:#f4f4f4;margin:0;padding:20px;font-family:Arial,sans-serif;">
+  <table align="center" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px;background:#fff;border-radius:8px;overflow:hidden;">
+    <tr><td style="background:rgb(20,54,100);padding:20px;text-align:center;"></td></tr>
+    <tr><td style="padding:30px;">
+      <h2 style="color:rgb(20,54,100);margin:0 0 20px;font-size:24px;">Request Canceled</h2>
+      <p style="color:#333;font-size:16px;line-height:1.5;margin:0 0 20px;">
+        The substitution request by <strong>${teacherName}</strong> has been canceled.
+      </p>
+      <table cellpadding="10" cellspacing="0" width="100%" style="border-collapse:collapse;font-size:16px;color:#333;">
+        <tr><td style="border:1px solid #e0e0e0;padding:10px;"><strong>Subject:</strong></td><td style="border:1px solid #e0e0e0;padding:10px;">${request.subject || '-'}</td></tr>
+        <tr><td style="border:1px solid #e0e0e0;padding:10px;"><strong>Room:</strong></td><td style="border:1px solid #e0e0e0;padding:10px;">${request.room || '-'}</td></tr>
+        <tr><td style="border:1px solid #e0e0e0;padding:10px;"><strong>Date:</strong></td><td style="border:1px solid #e0e0e0;padding:10px;">${request.day || '-'}</td></tr>
+      </table>
+    </td></tr>
+    <tr><td style="background:rgb(30,64,110);color:#fff;padding:15px;text-align:center;font-size:14px;">
+      <p style="margin:0;">Substitute Scheduler | The Episcopal Academy</p>
+      <p style="margin:5px 0;">1785 Bishop White Drive, Newtown Square, PA 19073</p>
+    </td></tr>
+  </table>
+</body></html>`; // unchanged
+      await Promise.all(notAssignedEmails.map(recipient => transporter.sendMail({
+        from: `"Substitute Scheduler" <${process.env.EMAIL_USER}>`,
+        to: recipient,
+        subject: `Request #${requestId} Canceled`,
+        html: basicHtml,
+      })));
     }
 
-    // Delete assignments and request after sending emails
-    await connection.promise().query('DELETE FROM request_assignments WHERE request_id = ?', [requestId]);
-    await connection.promise().query('DELETE FROM requests WHERE id = ?', [requestId]);
+    if (assignments.length) {
+      const assignedByEmail = {};
+      assignments.forEach(a => {
+        if (!assignedByEmail[a.email]) assignedByEmail[a.email] = { name: `${a.first_name} ${a.last_name}`, blocks: [] };
+        assignedByEmail[a.email].blocks.push(a.block);
+      });
+
+      await Promise.all(Object.entries(assignedByEmail).map(([email, { name, blocks }]) => {
+        const warningHtml = `
+        <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="background:#f4f4f4;margin:0;padding:20px;font-family:Arial,sans-serif;">
+  <table align="center" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px;background:#fff;border-radius:8px;overflow:hidden;">
+    <tr><td style="background:rgb(20,54,100);padding:20px;text-align:center;"></td></tr>
+    <tr><td style="padding:30px;">
+      <h2 style="color:rgb(20,54,100);margin:0 0 20px;font-size:24px;">Your Assignment Canceled</h2>
+      <p style="color:#333;font-size:16px;line-height:1.5;margin:0 0 20px;">
+        <strong>${name}</strong>, your assigned blocks for <strong>${teacherName}</strong>'s request have been canceled.
+      </p>
+      <div style="background:#ffebee;padding:15px;border-radius:6px;margin:15px 0;">
+        <p style="margin:0;font-weight:bold;color:#c62828;">
+          CANCELED BLOCKS: ${blocks.join(', ')}
+        </p>
+      </div>
+      <table cellpadding="10" cellspacing="0" width="100%" style="border-collapse:collapse;font-size:16px;color:#333;">
+        <tr><td style="border:1px solid #e0e0e0;padding:10px;"><strong>Subject:</strong></td><td style="border:1px solid #e0e0e0;padding:10px;">${request.subject || '-'}</td></tr>
+        <tr><td style="border:1px solid #e0e0e0;padding:10px;"><strong>Room:</strong></td><td style="border:1px solid #e0e0e0;padding:10px;">${request.room || '-'}</td></tr>
+        <tr><td style="border:1px solid #e0e0e0;padding:10px;"><strong>Date:</strong></td><td style="border:1px solid #e0e0e0;padding:10px;">${request.day || '-'}</td></tr>
+      </table>
+    </td></tr>
+    <tr><td style="background:rgb(30,64,110);color:#fff;padding:15px;text-align:center;font-size:14px;">
+      <p style="margin:0;">Substitute Scheduler | The Episcopal Academy</p>
+      <p style="margin:5px 0;">1785 Bishop White Drive, Newtown Square, PA 19073</p>
+    </td></tr>
+  </table>
+</body></html>
+        `; // unchanged
+        return transporter.sendMail({
+          from: `"Substitute Scheduler" <${process.env.EMAIL_USER}>`,
+          to: email,
+          subject: `Your Blocks Canceled – Request #${requestId}`,
+          html: warningHtml,
+        });
+      }));
+    }
 
     res.status(200).json({ message: 'Request canceled successfully', added: true });
   } catch (err) {
@@ -725,397 +726,197 @@ app.post('/cancel-request', async (req, res) => {
   }
 });
 
-app.post('/assign-substitute', async (req, res) => {
+
+
+
+
+
+
+app.post('/api/assign-substitute', async (req, res) => {
   const { token, password, requestId, blocks } = req.body;
 
-  // Validate request body
   if (!token || !password || !requestId || !Array.isArray(blocks) || blocks.length === 0) {
     return res.status(400).json({ error: 'Token, password, requestId, and blocks array are required' });
   }
 
   try {
-    // Verify JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const email = decoded.email;
-
-    if (!email || decoded.requestId !== parseInt(requestId)) {
-      return res.status(400).json({ error: 'Invalid or mismatched token' });
-    }
-
-    // Verify transporter configuration
+    // ---------- 1. Verify JWT ----------
+    let decoded;
     try {
-      await transporter.verify();
-      console.log('SMTP transporter verified successfully');
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch (err) {
-      console.error('SMTP configuration error:', err);
-      return res.status(500).json({ error: 'Email service configuration error: Invalid credentials' });
+      throw new Error('Invalid or expired token');
+    }
+    const email = decoded.email;
+    if (!email || decoded.requestId !== parseInt(requestId)) {
+      throw new Error('Invalid or mismatched token');
     }
 
-    // Check if the email exists in the Users table and get substitute details
-    const [userResults] = await connection.promise().query(
-      'SELECT id, first_name, last_name, role FROM Users WHERE email = ?',
+    // ---------- 2. Helper: promise-wrapped query ----------
+    const query = (sql, params) => new Promise((resolve, reject) => {
+      connection.query(sql, params, (err, results) => {
+        if (err) return reject(err);
+        resolve(results);
+      });
+    });
+
+    // ---------- 3. Get substitute (lock row) ----------
+    const userResults = await query(
+      'SELECT id, first_name, last_name, role FROM Users WHERE email = ? FOR UPDATE',
       [email]
     );
-    if (userResults.length === 0 || password !== 'ea1785ea') {
-      return res.status(400).json({ error: 'Invalid credentials' });
-    }
-    if (userResults[0].role === 'teacher') {
-      return res.status(400).json({ error: "You're a teacher!" });
-    }
+    if (userResults.length === 0) throw new Error('Substitute not found');
+    if (password !== 'ea1785ea') throw new Error('Invalid password');
+    if (userResults[0].role === 'teacher') throw new Error("You're a teacher!");
+
     const subId = userResults[0].id;
     const subName = `${userResults[0].first_name} ${userResults[0].last_name}`;
 
-    // Check if the request exists and get teacher and sent details
-    const [requestResults] = await connection.promise().query(
-      `
-      SELECT r.blocks_requested, r.subject, r.room, r.day, r.notes, r.teacher_id, r.sent,
-             t.email AS teacher_email, t.first_name AS teacher_first_name, t.last_name AS teacher_last_name
-      FROM requests r
-      JOIN Users t ON r.teacher_id = t.id
-      WHERE r.id = ? AND r.status != 'completed'
-      `,
+    // ---------- 4. Get request (lock row) ----------
+    const requestResults = await query(
+      `SELECT r.*, t.email AS teacher_email, t.first_name AS teacher_first_name, t.last_name AS teacher_last_name
+       FROM Requests r
+       JOIN Users t ON r.teacher_id = t.id
+       WHERE r.id = ? FOR UPDATE`,
       [requestId]
     );
-    if (requestResults.length === 0) {
-      return res.status(404).json({ error: 'Request not found or already completed' });
-    }
+    if (requestResults.length === 0) throw new Error('Request not found or already completed');
+
     const request = requestResults[0];
     const teacherEmail = request.teacher_email;
     const teacherName = `${request.teacher_first_name} ${request.teacher_last_name}`;
-    const requestedBlocks = request.blocks_requested ? request.blocks_requested.split(',').map(b => b.trim()) : [];
-    const sentEmails = request.sent ? [...new Set(request.sent.split(',').map(e => e.trim()))] : [];
+    const requestedBlocks = request.blocks_requested
+      ? request.blocks_requested.split(',').map(b => b.trim())
+      : [];
+    const sentEmails = request.sent
+      ? [...new Set(request.sent.split(',').map(e => e.trim()))]
+      : [];
 
-    // Validate selected blocks
+    // ---------- 5. Validate blocks ----------
     const invalidBlocks = blocks.filter(b => !requestedBlocks.includes(b));
     if (invalidBlocks.length > 0) {
-      return res.status(400).json({ error: `Invalid blocks: ${invalidBlocks.join(', ')}` });
+      throw new Error(`Invalid blocks: ${invalidBlocks.join(', ')}`);
     }
 
-    // Check if selected blocks are already assigned
-    const [existingAssignments] = await connection.promise().query(
+    // ---------- 6. Check for conflicts ----------
+    const existing = await query(
       'SELECT block FROM request_assignments WHERE request_id = ? AND block IN (?)',
       [requestId, blocks]
     );
-    const assignedBlocks = existingAssignments.map(a => a.block);
-    const alreadyTakenBlocks = blocks.filter(b => assignedBlocks.includes(b));
-    if (alreadyTakenBlocks.length > 0) {
-      return res.status(409).json({ error: `Blocks already taken: ${alreadyTakenBlocks.join(', ')}` });
+    const taken = existing.map(r => r.block);
+    const conflict = blocks.filter(b => taken.includes(b));
+    if (conflict.length > 0) {
+      throw new Error(`Blocks already taken: ${conflict.join(', ')}`);
     }
 
-    // Insert assignments into request_assignments
-    const insertQuery = 'INSERT INTO request_assignments (request_id, sub_id, block) VALUES ?';
+    // ---------- 7. Insert assignments ----------
     const values = blocks.map(block => [requestId, subId, block]);
-    await connection.promise().query(insertQuery, [values]);
+    await query(
+      'INSERT INTO request_assignments (request_id, sub_id, block) VALUES ?',
+      [values]
+    );
 
-    // Prepare email content for teacher and substitutes
-    const emailContent = {
-      subject: `Substitution Request #${requestId} Assigned`,
-      html: `
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Request Assigned Notification</title>
-        </head>
-        <body style="background-color: #f4f4f4; margin: 0; padding: 20px; font-family: Arial, sans-serif;">
-          <table align="center" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
-            <tr>
-              <td style="background-color: rgb(20, 54, 100); padding: 20px; text-align: center;">
-              </td>
-            </tr>
-            <tr>
-              <td style="padding: 30px;">
-                <h2 style="color: rgb(20, 54, 100); margin: 0 0 20px; font-size: 24px;">Substitution Request Assigned</h2>
-                <p style="color: #333333; font-size: 16px; line-height: 1.5; margin: 0 0 20px;">
-                  The following blocks for the substitution request by <strong>${teacherName}</strong> have been assigned to <strong>${subName}</strong>.
-                </p>
-                <table cellpadding="10" cellspacing="0" width="100%" style="border-collapse: collapse; font-size: 16px; color: #333333;">
-                  <tr>
-                    <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Blocks:</strong></td>
-                    <td style="border: 1px solid #e0e0e0; padding: 10px;">${blocks.join(', ')}</td>
-                  </tr>
-                  <tr>
-                    <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Subject:</strong></td>
-                    <td style="border: 1px solid #e0e0e0; padding: 10px;">${request.subject || '-'}</td>
-                  </tr>
-                  <tr>
-                    <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Room:</strong></td>
-                    <td style="border: 1px solid #e0e0e0; padding: 10px;">${request.room || '-'}</td>
-                  </tr>
-                  <tr>
-                    <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Date:</strong></td>
-                    <td style="border: 1px solid #e0e0e0; padding: 10px;">${request.day || '-'}</td>
-                  </tr>
-                  <tr>
-                    <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Notes:</strong></td>
-                    <td style="border: 1px solid #e0e0e0; padding: 10px;">${request.notes || 'None'}</td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-            <tr>
-              <td style="background-color: rgb(30, 64, 110); color: #ffffff; padding: 15px; text-align: center; font-size: 14px;">
-                <p style="margin: 0;">Substitute Scheduler | The Episcopal Academy</p>
-                <p style="margin: 5px 0;">1785 Bishop White Drive, Newtown Square, PA 19073</p>
-              </td>
-            </tr>
-          </table>
-        </body>
-        </html>
-      `,
-      text: `
-        Substitution Request Assigned
-        
-        The following blocks for request #${requestId} by ${teacherName} have been assigned to ${subName}:
-        
-        Blocks: ${blocks.join(', ')}
-        Subject: ${request.subject || '-'}
-        Room: ${request.room || '-'}
-        Date: ${request.day || '-'}
-        Notes: ${request.notes || 'None'}
-      `
-    };
+    // ---------- 8. Check if now fully covered ----------
+    const assignedRows = await query(
+      'SELECT block FROM request_assignments WHERE request_id = ?',
+      [requestId]
+    );
+    const assignedBlocks = assignedRows.map(r => r.block);
+    const isFullyCovered = requestedBlocks.every(b => assignedBlocks.includes(b));
 
-    // Send email to teacher
-    console.log(`Sending assignment email to teacher: ${teacherEmail}`);
-    try {
-      const teacherInfo = await transporter.sendMail({
-        from: `"Substitute Scheduler" <${process.env.EMAIL_USER}>`,
-        to: teacherEmail,
-        subject: emailContent.subject,
-        text: emailContent.text,
-        html: emailContent.html,
-      });
-      console.log(`Email sent to ${teacherEmail}: Message ID ${teacherInfo.messageId}`);
-    } catch (err) {
-      console.error('Error sending email to teacher:', err);
-      return res.status(500).json({ error: `Failed to send email to teacher: ${err.message}` });
-    }
-
-    // Send email to other substitutes (excluding the accepting substitute)
-    const otherSubEmails = sentEmails.filter(e => e !== email);
-    if (otherSubEmails.length > 0) {
-      console.log(`Sending assignment notification emails to substitutes: ${otherSubEmails.join(', ')}`);
-      try {
-        await Promise.all(
-          otherSubEmails.map(async (recipient) => {
-            const info = await transporter.sendMail({
-              from: `"Substitute Scheduler" <${process.env.EMAIL_USER}>`,
-              to: recipient,
-              subject: emailContent.subject,
-              text: emailContent.text,
-              html: emailContent.html,
-            });
-            console.log(`Email sent to ${recipient}: Message ID ${info.messageId}`);
-            return info;
-          })
-        );
-      } catch (err) {
-        console.error('Error sending emails to substitutes:', err);
-        return res.status(500).json({ error: `Failed to send emails to substitutes: ${err.message}` });
-      }
-    } else {
-      console.log('No other substitutes to notify for request', requestId);
-    }
-
-    res.status(200).json({ message: 'Substitute assigned successfully', email, blocks, added: true });
-  } catch (err) {
-    console.error('Error assigning substitute:', err);
-    res.status(400).json({ error: `Invalid token or server error: ${err.message}` });
-  }
-});
-
-
-app.get('/get-subject-emails', (req, res) => {
-  const { subject } = req.query;  // Access the subject as a string
-
-  if (!subject) {
-    return res.status(400).json({ error: 'Subject is required' });
-  }
-
-  let query;
-  let queryParams;
-
-  if (subject !== 'Other') {
-    query = `
-      SELECT first_name, last_name, email 
-      FROM Users 
-      WHERE specialty = ? AND role = 'substitute'
-    `;
-    queryParams = [subject];
-  } else {
-    query = `
-      SELECT first_name, last_name, email 
-      FROM Users 
-      WHERE role = 'substitute'
-    `;
-    queryParams = [];
-  }
-
-  connection.query(query, queryParams, (err, results) => {
-    if (err) {
-      console.error('Error executing query:', err);
-      return res.status(500).json({ error: 'Database query failed' });
-    }
-
-    if (results.length === 0) {
-      query = `
-      SELECT first_name, last_name, email 
-      FROM Users 
-      WHERE role = 'substitute'
-    `;
-      queryParams = [];
-      connection.query(query, queryParams, (err, results) => {
-        if (err) {
-          console.error('Error executing query:', err);
-          return res.status(500).json({ error: 'Database query failed' });
-        }
-        return res.json(results);
-      });
-    } else {
-
-      return res.json(results);
-    }
-  });
-});
-
-
-
-
-
-app.delete('/requests/:requestId', (req, res) => {
-  const { requestId } = req.params;
-
-  if (!requestId) {
-    return res.status(400).json({ error: 'RequestId is required.' });
-  }
-
-  // SQL query to get all data from the request
-  const selectQuery = 'SELECT * FROM requests WHERE id = ?';
-
-  connection.query(selectQuery, [requestId], (err, results) => {
-    if (err) {
-      console.error('Error fetching request data:', err.message);
-      return res.status(500).json({ error: 'An error occurred while fetching the request data.' });
-    }
-
-    if (results.length === 0) {
-      return res.status(404).json({ error: 'Request not found.' });
-    }
-
-    const requestData = results[0];
-    const sentColumn = requestData.sent;
-    const emailAddresses = sentColumn.split(',').map(email => email.trim());
-
-    // SQL query to get the teacher's email from Users table
-    const selectUserQuery = 'SELECT * FROM Users WHERE id = ?';
-
-    connection.query(selectUserQuery, [requestData.teacher_id], (err, userResults) => {
-      if (err) {
-        console.error('Error fetching user data:', err.message);
-        return res.status(500).json({ error: 'An error occurred while fetching the user data.' });
-      }
-
-      if (userResults.length === 0) {
-        return res.status(404).json({ error: 'User not found.' });
-      }
-
-      const teacherEmail = userResults[0].email;
-      const teacherName = userResults[0].first_name; + ' ' + userResults[0].last_name;
-
-      const mailOptions = {
-        from: 'ishaansingh779@gmail.com',
-        to: emailAddresses,
-      
-        subject: 'Request Deleted Notification',
-        html: `
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Request Deleted Notification</title>
-</head>
-<body style="background-color: #f4f4f4; margin: 0; padding: 20px; font-family: Arial, sans-serif;">
-  <table align="center" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
-    <tr>
-      <td style="background-color: rgb(20, 54, 100); padding: 20px; text-align: center;">
-      </td>
-    </tr>
-    <tr>
-      <td style="padding: 30px;">
-        <h2 style="color: rgb(20, 54, 100); margin: 0 0 20px; font-size: 24px;">Request Deleted</h2>
-        <p style="color: #333333; font-size: 16px; line-height: 1.5; margin: 0 0 20px;">
-          The request by <strong>${teacherName}</strong> has been deleted.
-        </p>
-        <table cellpadding="10" cellspacing="0" width="100%" style="border-collapse: collapse; font-size: 16px; color: #333333;">
-          <tr>
-            <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Blocks:</strong></td>
-            <td style="border: 1px solid #e0e0e0; padding: 10px;">${requestData.blocks_requested || '-'}</td>
-          </tr>
-          <tr>
-            <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Subject:</strong></td>
-            <td style="border: 1px solid #e0e0e0; padding: 10px;">${requestData.subject || '-'}</td>
-          </tr>
-          <tr>
-            <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Room:</strong></td>
-            <td style="border: 1px solid #e0e0e0; padding: 10px;">${requestData.room || '-'}</td>
-          </tr>
-          <tr>
-            <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Date:</strong></td>
-            <td style="border: 1px solid #e0e0e0; padding: 10px;">${requestData.day || '-'}</td>
-          </tr>
-          <tr>
-            <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Notes:</strong></td>
-            <td style="border: 1px solid #e0e0e0; padding: 10px;">${requestData.notes || 'None'}</td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-    <tr>
-      <td style="background-color: rgb(30, 64, 110); color: #ffffff; padding: 15px; text-align: center; font-size: 14px;">
-        <p style="margin: 0;">Substitute Scheduler | The Episcopal Academy</p>
-        <p style="margin: 5px 0;">1785 Bishop White Drive, Newtown Square, PA 19073</p>
-      </td>
-    </tr>
+    // ---------- 9. Email to teacher ----------
+    const teacherHtml = `
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="background:#f4f4f4;margin:0;padding:20px;font-family:Arial,sans-serif;">
+  <table align="center" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px;background:#fff;border-radius:8px;overflow:hidden;">
+    <tr><td style="background:rgb(20,54,100);padding:20px;text-align:center;"></td></tr>
+    <tr><td style="padding:30px;">
+      <h2 style="color:rgb(20,54,100);margin:0 0 20px;font-size:24px;">Blocks Assigned</h2>
+      <p style="color:#333;font-size:16px;line-height:1.5;margin:0 0 20px;">
+        <strong>${subName}</strong> has signed up for: <strong>${blocks.join(', ')}</strong>
+      </p>
+      <table cellpadding="10" cellspacing="0" width="100%" style="border-collapse:collapse;font-size:16px;color:#333;">
+        <tr><td style="border:1px solid #e0e0e0;padding:10px;"><strong>Subject:</strong></td><td style="border:1px solid #e0e0e0;padding:10px;">${request.subject || '-'}</td></tr>
+        <tr><td style="border:1px solid #e0e0e0;padding:10px;"><strong>Room:</strong></td><td style="border:1px solid #e0e0e0;padding:10px;">${request.room || '-'}</td></tr>
+        <tr><td style="border:1px solid #e0e0e0;padding:10px;"><strong>Date:</strong></td><td style="border:1px solid #e0e0e0;padding:10px;">${request.day || '-'}</td></tr>
+      </table>
+    </td></tr>
+    <tr><td style="background:rgb(30,64,110);color:#fff;padding:15px;text-align:center;font-size:14px;">
+      <p style="margin:0;">Substitute Scheduler | The Episcopal Academy</p>
+      <p style="margin:5px 0;">1785 Bishop White Drive, Newtown Square, PA 19073</p>
+    </td></tr>
   </table>
-</body>
-</html>
-`
-      };
+</body></html>`;
 
-      transporter.sendMail(mailOptions, (error, info) => {
-        if (error) {
-          console.error('Error sending email:', error);
-          return res.status(500).json({ error: 'An error occurred while sending the notification email.' });
-        }
-
-        console.log('Email sent:', info.response);
-
-        // SQL query to delete the row with the given primary key
-        const deleteQuery = 'DELETE FROM requests WHERE id = ?';
-
-        connection.query(deleteQuery, [requestId], (err, result) => {
-          if (err) {
-            console.error('Error deleting request:', err.message);
-            return res.status(500).json({ error: 'An error occurred while deleting the request.' });
-          }
-
-          if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'Request not found.' });
-          }
-
-          res.status(200).json({ message: 'Request successfully deleted and notification email sent.' });
-        });
-      });
+    await transporter.sendMail({
+      from: `"Substitute Scheduler" <${process.env.EMAIL_USER}>`,
+      to: teacherEmail,
+      subject: `Blocks Assigned: ${blocks.join(', ')}`,
+      html: teacherHtml,
     });
-  });
+
+    // ---------- 10. If fully covered → final email (NO status change) ----------
+    if (isFullyCovered) {
+      const finalHtml = `
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="background:#f4f4f4;margin:0;padding:20px;font-family:Arial,sans-serif;">
+  <table align="center" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px;background:#fff;border-radius:8px;overflow:hidden;">
+    <tr><td style="background:rgb(20,54,100);padding:20px;text-align:center;"></td></tr>
+    <tr><td style="padding:30px;">
+      <h2 style="color:rgb(20,54,100);margin:0 0 20px;font-size:24px;">Request Fully Covered</h2>
+      <p style="color:#333;font-size:16px;line-height:1.5;margin:0 0 20px;">
+        All blocks for <strong>${teacherName}</strong>'s request have been filled. No further action needed.
+      </p>
+      <table cellpadding="10" cellspacing="0" width="100%" style="border-collapse:collapse;font-size:16px;color:#333;">
+        <tr><td style="border:1px solid #e0e0e0;padding:10px;"><strong>Blocks:</strong></td><td style="border:1px solid #e0e0e0;padding:10px;">${requestedBlocks.join(', ')}</td></tr>
+        <tr><td style="border:1px solid #e0e0e0;padding:10px;"><strong>Subject:</strong></td><td style="border:1px solid #e0e0e0;padding:10px;">${request.subject || '-'}</td></tr>
+        <tr><td style="border:1px solid #e0e0e0;padding:10px;"><strong>Room:</strong></td><td style="border:1px solid #e0e0e0;padding:10px;">${request.room || '-'}</td></tr>
+        <tr><td style="border:1px solid #e0e0e0;padding:10px;"><strong>Date:</strong></td><td style="border:1px solid #e0e0e0;padding:10px;">${request.day || '-'}</td></tr>
+      </table>
+    </td></tr>
+    <tr><td style="background:rgb(30,64,110);color:#fff;padding:15px;text-align:center;font-size:14px;">
+      <p style="margin:0;">Substitute Scheduler | The Episcopal Academy</p>
+      <p style="margin:5px 0;">1785 Bishop White Drive, Newtown Square, PA 19073</p>
+    </td></tr>
+  </table>
+</body></html>`;
+
+      const allRecipients = [...sentEmails, teacherEmail].filter((v, i, a) => a.indexOf(v) === i);
+
+      await Promise.all(
+        allRecipients.map(recipient =>
+          transporter.sendMail({
+            from: `"Substitute Scheduler" <${process.env.EMAIL_USER}>`,
+            to: recipient,
+            subject: 'Request Fully Covered – No More Blocks Available',
+            html: finalHtml,
+          })
+        )
+      );
+    }
+
+    // ---------- 11. Success ----------
+    res.status(200).json({
+      message: 'Substitute assigned successfully',
+      blocks,
+      added: true,
+      fullyCovered: isFullyCovered,
+    });
+  } catch (err) {
+    console.error('Assign substitute error:', err);
+    res.status(400).json({ error: err.message });
+  }
 });
 
 
 
 
- // when a sub cancels their assignment
-app.patch('/requests/:id/cancel-substitute', async (req, res) => {
+
+
+
+
+// when a sub cancels their assignment
+app.patch('/api/requests/:id/cancel-substitute', async (req, res) => {
   const { id } = req.params;
   const { email, block } = req.body;
 
@@ -1143,7 +944,7 @@ app.patch('/requests/:id/cancel-substitute', async (req, res) => {
     // Fetch request details and teacher info
     const [requestResults] = await connection.promise().query(
       'SELECT r.blocks_requested, r.subject, r.room, r.day, r.notes, r.teacher_id, u.first_name, u.last_name, u.email AS teacher_email ' +
-      'FROM requests r JOIN Users u ON r.teacher_id = u.id WHERE r.id = ?',
+      'FROM Requests r JOIN Users u ON r.teacher_id = u.id WHERE r.id = ?',
       [id]
     );
     if (requestResults.length === 0) {
@@ -1252,7 +1053,7 @@ app.patch('/requests/:id/cancel-substitute', async (req, res) => {
 });
 
 
-app.get('/get-everything', async (req, res) => {
+app.get('/api/get-everything', async (req, res) => {
   try {
     const query = `
       SELECT 
@@ -1274,13 +1075,13 @@ app.get('/get-everything', async (req, res) => {
           ),
           '[]'
         ) AS assignments
-      FROM requests r
+      FROM Requests r
       JOIN Users t ON r.teacher_id = t.id
       GROUP BY r.id, r.teacher_id, r.blocks_requested, r.subject, r.room, r.day, r.status, t.first_name, t.last_name
     `;
 
     const [results] = await connection.promise().query(query);
-    
+
     const formattedResults = results.map(row => ({
       ...row,
       assignments: row.assignments ? JSON.parse(row.assignments) : []
@@ -1293,11 +1094,11 @@ app.get('/get-everything', async (req, res) => {
   }
 });
 
-app.get('/edit-request/:requestId', (req, res) => {
+app.get('/api/edit-request/:requestId', (req, res) => {
 
   const requestId = req.params.requestId;
   console.log('Received requestId:', requestId); // Log to confirm route is hit
-  const query = 'SELECT * FROM requests WHERE id = ?';
+  const query = 'SELECT * FROM Requests WHERE id = ?';
 
   connection.query(query, [requestId], (err, results) => {
     if (err) {
@@ -1317,45 +1118,56 @@ app.get('/edit-request/:requestId', (req, res) => {
 });
 
 
-
-app.put('/requests/:id', (req, res) => {
+app.put('/api/requests/:id', (req, res) => {
   const { id } = req.params;
   const updatedData = req.body;
 
-  const { teacher_id, blocks_requested, subject, room, day, subs, notes, sent } = updatedData;
+  const { teacher_id, blocks_requested, subject, room, day, notes, sent } = updatedData;
 
-  // SQL query to update the request
+  // === VALIDATE required fields ===
+  if (!teacher_id || !blocks_requested || !subject || !room || !day) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  // === Normalize blocks_requested to comma-separated string ===
+  const blocksStr = Array.isArray(blocks_requested)
+    ? blocks_requested.join(',')
+    : String(blocks_requested);
+
+  // === SQL: Remove `subs` column (doesn't exist) ===
   const query = `
-      UPDATE requests
-      SET 
-          teacher_id = ?,
-          blocks_requested = ?,
-          subject = ?,
-          room = ?,
-          day = ?,
-          subs = ?,
-          notes = ?,
-          sent = ?
-      WHERE id = ?
+    UPDATE Requests
+    SET 
+        teacher_id = ?,
+        blocks_requested = ?,
+        subject = ?,
+        room = ?,
+        day = ?,
+        notes = ?,
+        sent = ?
+    WHERE id = ?
   `;
 
-  // Execute the query with the data values
-  connection.execute(query, [teacher_id, blocks_requested, subject, room, day, subs, notes, sent, id], (err, result) => {
-    if (err) {
-      console.error('Error updating request:', err);
-      return res.status(500).json({ error: 'Internal server error' });
-    }
+  connection.execute(
+    query,
+    [teacher_id, blocksStr, subject, room, day, notes, sent || null, id],
+    (err, result) => {
+      if (err) {
+        console.error('Error updating request:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Request not found' });
-    }
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: 'Request not found' });
+      }
 
-    return res.status(200).json({ message: 'Request updated successfully' });
-  });
+      res.status(200).json({ message: 'Request updated successfully' });
+    }
+  );
 });
 
 
-app.get('/get-subs', (req, res) => {
+app.get('/api/get-subs', (req, res) => {
   const query = 'SELECT * FROM Users WHERE role = ?';
   const role = 'substitute'; // The role you're fetching from the database
 
@@ -1369,7 +1181,7 @@ app.get('/get-subs', (req, res) => {
   });
 });
 
-app.get('/get-teacher-ids', (req, res) => {
+app.get('/api/get-teacher-ids', (req, res) => {
   const query = 'SELECT id, first_name, last_name FROM Users WHERE role = ?';
   const role = 'teacher'; // The role you're fetching from the database
 
@@ -1382,7 +1194,7 @@ app.get('/get-teacher-ids', (req, res) => {
   });
 });
 
-app.get('/get-users', (req, res) => {
+app.get('/api/get-users', (req, res) => {
   const query = 'SELECT * FROM Users';
 
   connection.query(query, [], (error, results) => {
@@ -1395,7 +1207,7 @@ app.get('/get-users', (req, res) => {
 
 });
 
-app.post('/add-user', (req, res) => {
+app.post('/api/add-user', (req, res) => {
   const { first_name, last_name, email, role, departments, phone_number } = req.body;
   const query = `INSERT INTO Users (email, first_name, last_name, role, departments, phone_number)
                  VALUES (?, ?, ?, ?, ?, ?)`;
@@ -1416,7 +1228,7 @@ app.post('/add-user', (req, res) => {
   });
 });
 
-app.delete('/delete-user/:id', (req, res) => {
+app.delete('/api/delete-user/:id', (req, res) => {
   const userId = req.params.id;
   const query = 'DELETE FROM Users WHERE id = ?';
 
@@ -1432,7 +1244,7 @@ app.delete('/delete-user/:id', (req, res) => {
   });
 });
 
-app.patch('/update-user/:id', (req, res) => {
+app.patch('/api/update-user/:id', (req, res) => {
   const { id: userId } = req.params;
   const { first_name, last_name, email, role, departments, phone_number } = req.body;
   const query = 'UPDATE Users SET first_name = ?, last_name = ?, email = ?, role = ?, departments = ?, phone_number = ? WHERE id = ?';
@@ -1446,14 +1258,14 @@ app.patch('/update-user/:id', (req, res) => {
     if (results.affectedRows === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
-    res.json({ 
-      message: 'User updated successfully', 
+    res.json({
+      message: 'User updated successfully',
       user: { id: userId, first_name, last_name, email, role, departments, phone_number }
     });
   });
 });
 
-app.get('/check-request', (req, res) => {
+app.get('/api/check-request', (req, res) => {
   const { requestId } = req.query;
   const query = 'SELECT COUNT(*) as count FROM Requests WHERE id = ?';
 
@@ -1469,7 +1281,7 @@ app.get('/check-request', (req, res) => {
 
 
 
-app.patch('/requests/:id/complete', async (req, res) => {
+app.patch('/api/requests/:id/complete', async (req, res) => {
   const { id } = req.params;
   const { email, block } = req.body;
 
@@ -1499,7 +1311,7 @@ app.patch('/requests/:id/complete', async (req, res) => {
     const [requestResults] = await connection.promise().query(
       'SELECT r.blocks_requested, r.subject, r.room, r.day, r.notes, r.status, r.teacher_id, ' +
       'u.first_name AS teacher_first_name, u.last_name AS teacher_last_name, u.email AS teacher_email ' +
-      'FROM requests r JOIN Users u ON r.teacher_id = u.id WHERE r.id = ?',
+      'FROM Requests r JOIN Users u ON r.teacher_id = u.id WHERE r.id = ?',
       [id]
     );
     if (requestResults.length === 0) {
@@ -1523,7 +1335,7 @@ app.patch('/requests/:id/complete', async (req, res) => {
     // Update request status if all blocks are assigned
     if (allBlocksAssigned) {
       const [updateResult] = await connection.promise().query(
-        'UPDATE requests SET status = "completed" WHERE id = ?',
+        'UPDATE Requests SET status = "completed" WHERE id = ?',
         [id]
       );
       if (updateResult.affectedRows === 0) {
@@ -1608,51 +1420,53 @@ app.patch('/requests/:id/complete', async (req, res) => {
   }
 });
 
-app.get('/admin-requests', async (req, res) => {
+
+
+app.get('/api/admin-requests', async (req, res) => {
   const { page = 1, limit = 10, includeCompleted = 'false' } = req.query;
   const offset = (page - 1) * limit;
 
   try {
-    // Fetch requests with teacher info, optionally including completed
-    const query = `
+    const showCompleted = includeCompleted === 'true';
+    const whereClause = showCompleted
+      ? '1'
+      : '(r.status = "uncompleted" OR r.status = "pending" OR r.status = "in_progress")';
+
+    const requestQuery = `
       SELECT 
         r.id, r.day, r.subject, r.room, r.notes, r.blocks_requested, r.status,
         CONCAT(u.first_name, ' ', u.last_name) AS teacher,
         u.email AS teacher_email
-      FROM requests r
+      FROM Requests r
       JOIN Users u ON r.teacher_id = u.id
-      ${includeCompleted === 'true' ? '' : 'WHERE r.status != "completed"'}
+      WHERE ${whereClause}
+      ORDER BY r.id DESC
       LIMIT ? OFFSET ?
     `;
-    const [requestResults] = await connection.promise().query(query, [parseInt(limit), parseInt(offset)]);
 
-    // Fetch assigned blocks with substitute names and emails
+
+    const [requestResults] = await connection.promise().query(requestQuery, [parseInt(limit), parseInt(offset)]);
+
     const formattedResults = await Promise.all(
-      requestResults.map(async request => {
-        const blocksRequested = request.blocks_requested ? request.blocks_requested.split(',').map(b => b.trim()) : [];
-        
-        // Fetch assigned blocks, substitute names, and emails
+      requestResults.map(async (request) => {
+        const blocksRequested = request.blocks_requested
+          ? request.blocks_requested.split(',').map(b => b.trim())
+          : [];
+
         const [assignmentResults] = await connection.promise().query(
-          `
-          SELECT ra.block, CONCAT(u.first_name, ' ', u.last_name) AS substitute_name, u.email AS substitute_email
-          FROM request_assignments ra
-          JOIN Users u ON ra.sub_id = u.id
-          WHERE ra.request_id = ?
-          `,
+          `SELECT ra.block, CONCAT(u.first_name, ' ', u.last_name) AS substitute_name, u.email AS substitute_email
+           FROM request_assignments ra
+           JOIN Users u ON ra.sub_id = u.id
+           WHERE ra.request_id = ?`,
           [request.id]
         );
 
-        // Create blocks array with assignment status
         const assignedBlocks = assignmentResults.map(a => a.block);
         const blocks = blocksRequested.map(block => ({
           block,
           assigned: assignedBlocks.includes(block),
-          substitute_name: assignedBlocks.includes(block)
-            ? assignmentResults.find(a => a.block === block).substitute_name
-            : null,
-          substitute_email: assignedBlocks.includes(block)
-            ? assignmentResults.find(a => a.block === block).substitute_email
-            : null,
+          substitute_name: assignmentResults.find(a => a.block === block)?.substitute_name || null,
+          substitute_email: assignmentResults.find(a => a.block === block)?.substitute_email || null,
         }));
 
         return {
@@ -1669,23 +1483,27 @@ app.get('/admin-requests', async (req, res) => {
       })
     );
 
-    // Get total count for pagination
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM requests r
+      FROM Requests r
       JOIN Users u ON r.teacher_id = u.id
-      ${includeCompleted === 'true' ? '' : 'WHERE r.status != "completed"'}
+      WHERE ${whereClause}
     `;
     const [[{ total }]] = await connection.promise().query(countQuery);
 
     res.status(200).json({ requests: formattedResults, total });
   } catch (err) {
-    console.error('Error fetching admin requests:', err);
-    res.status(500).json({ error: `Failed to fetch requests: ${err.message}` });
+    console.error('Error in /api/admin-requests:', err);
+    res.status(500).json({ error: 'Failed to fetch admin requests' });
   }
 });
 
-app.post('/accept-request', async (req, res) => {
+
+
+
+
+
+app.post('/api/accept-request', async (req, res) => {
   const { requestId, email, blocks } = req.body;
 
   if (!requestId || !email || !blocks || !Array.isArray(blocks) || blocks.length === 0) {
@@ -1702,7 +1520,7 @@ app.post('/accept-request', async (req, res) => {
 
     // Verify request exists
     const [requestResults] = await connection.promise().query(
-      'SELECT blocks_requested FROM requests WHERE id = ? AND status != "completed"',
+      'SELECT blocks_requested FROM Requests WHERE id = ? AND status != "completed"',
       [requestId]
     );
     if (requestResults.length === 0) {
@@ -1743,7 +1561,7 @@ app.post('/accept-request', async (req, res) => {
 });
 
 
-app.get('/substitute-requests', async (req, res) => {
+app.get('/api/substitute-requests', async (req, res) => {
   const { email } = req.query;
 
   if (!email) {
@@ -1753,7 +1571,7 @@ app.get('/substitute-requests', async (req, res) => {
   try {
     // Fetch substitute ID
     const [userResults] = await connection.promise().query(
-      'SELECT id FROM Users WHERE email = ?', 
+      'SELECT id FROM Users WHERE email = ?',
       [email]
     );
     if (userResults.length === 0) {
@@ -1774,7 +1592,7 @@ app.get('/substitute-requests', async (req, res) => {
           ),
           '[]'
         ) AS blocks
-      FROM requests r
+      FROM Requests r
       JOIN Users t ON r.teacher_id = t.id
       JOIN request_assignments ra ON r.id = ra.request_id
       WHERE ra.sub_id = ? AND r.status != 'completed'
@@ -1798,7 +1616,7 @@ app.get('/substitute-requests', async (req, res) => {
 
 
 
-app.post('/cancel-assignment', async (req, res) => {
+app.post('/api/cancel-assignment', async (req, res) => {
   const { email, requestId } = req.body;
 
   if (!email || !requestId) {
@@ -1806,30 +1624,24 @@ app.post('/cancel-assignment', async (req, res) => {
   }
 
   try {
-    // Verify transporter configuration
-    try {
-      await transporter.verify();
-    } catch (err) {
-      console.error('SMTP configuration error:', err);
-      return res.status(500).json({ error: 'Email service configuration error: Invalid credentials' });
-    }
-
-    // Fetch substitute ID
-    const [userResults] = await connection.promise().query('SELECT id FROM Users WHERE email = ?', [email]);
-    if (userResults.length === 0) {
+    // Get canceling substitute's ID and name
+    const [subResults] = await connection.promise().query(
+      'SELECT id, first_name, last_name FROM Users WHERE email = ?',
+      [email]
+    );
+    if (subResults.length === 0) {
       return res.status(404).json({ error: 'Substitute not found' });
     }
-    const subId = userResults[0].id;
+    const subId = subResults[0].id;
+    const subName = `${subResults[0].first_name} ${subResults[0].last_name}`;
 
-    // Fetch request details and teacher email
+    // Get request + teacher + sent list
     const [requestResults] = await connection.promise().query(
-      `
-      SELECT r.blocks_requested, r.subject, r.room, r.day, r.notes,
-             t.email AS teacher_email, t.first_name AS teacher_first_name, t.last_name AS teacher_last_name
-      FROM requests r
-      JOIN Users t ON r.teacher_id = t.id
-      WHERE r.id = ? AND r.status != 'completed'
-      `,
+      `SELECT r.blocks_requested, r.subject, r.room, r.day, r.notes, r.sent,
+              t.email AS teacher_email, t.first_name AS teacher_first_name, t.last_name AS teacher_last_name
+       FROM Requests r
+       JOIN Users t ON r.teacher_id = t.id
+       WHERE r.id = ? AND r.status != 'completed'`,
       [requestId]
     );
     if (requestResults.length === 0) {
@@ -1839,15 +1651,10 @@ app.post('/cancel-assignment', async (req, res) => {
     const request = requestResults[0];
     const teacherEmail = request.teacher_email;
     const teacherName = `${request.teacher_first_name} ${request.teacher_last_name}`;
+    const requestedBlocks = request.blocks_requested ? request.blocks_requested.split(',').map(b => b.trim()) : [];
+    const sentEmails = request.sent ? [...new Set(request.sent.split(',').map(e => e.trim()))] : [];
 
-    // Fetch all substitute emails
-    const [substituteResults] = await connection.promise().query(
-      'SELECT email FROM Users WHERE role = ? AND email != ?',
-      ['substitute', email]
-    );
-    const substituteEmails = substituteResults.map(row => row.email);
-
-    // Fetch assigned blocks for this substitute
+    // Get blocks being canceled
     const [assignmentResults] = await connection.promise().query(
       'SELECT block FROM request_assignments WHERE request_id = ? AND sub_id = ?',
       [requestId, subId]
@@ -1857,98 +1664,109 @@ app.post('/cancel-assignment', async (req, res) => {
     }
     const canceledBlocks = assignmentResults.map(a => a.block);
 
-    // Delete assignments
+    // === Check if was fully covered BEFORE cancel ===
+    const [beforeResults] = await connection.promise().query(
+      'SELECT block FROM request_assignments WHERE request_id = ?',
+      [requestId]
+    );
+    const wasFullyCovered = requestedBlocks.every(b => beforeResults.some(r => r.block === b));
+
+    // === DELETE assignments ===
     await connection.promise().query(
       'DELETE FROM request_assignments WHERE request_id = ? AND sub_id = ?',
       [requestId, subId]
     );
 
-    // Prepare email content
-    const subject = `Substitution Blocks Canceled for Request #${requestId}`;
-    const html = `
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Blocks Canceled Notification</title>
-      </head>
-      <body style="background-color: #f4f4f4; margin: 0; padding: 20px; font-family: Arial, sans-serif;">
-        <table align="center" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
-          <tr>
-            <td style="background-color: rgb(20, 54, 100); padding: 20px; text-align: center;">
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 30px;">
-              <h2 style="color: rgb(20, 54, 100); margin: 0 0 20px; font-size: 24px;">Substitution Blocks Canceled</h2>
-              <p style="color: #333333; font-size: 16px; line-height: 1.5; margin: 0 0 20px;">
-                The following blocks for a substitution request by <strong>${teacherName}</strong> have been canceled and are now available.
-              </p>
-              <table cellpadding="10" cellspacing="0" width="100%" style="border-collapse: collapse; font-size: 16px; color: #333333;">
-                <tr>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Blocks:</strong></td>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;">${canceledBlocks.join(', ') || '-'}</td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Subject:</strong></td>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;">${request.subject || '-'}</td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Room:</strong></td>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;">${request.room || '-'}</td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Date:</strong></td>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;">${request.day || '-'}</td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;"><strong>Notes:</strong></td>
-                  <td style="border: 1px solid #e0e0e0; padding: 10px;">${request.notes || 'None'}</td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color: rgb(30, 64, 110); color: #ffffff; padding: 15px; text-align: center; font-size: 14px;">
-              <p style="margin: 0;">Substitute Scheduler | The Episcopal Academy</p>
-              <p style="margin: 5px 0;">1785 Bishop White Drive, Newtown Square, PA 19073</p>
-            </td>
-          </tr>
-        </table>
-      </body>
-      </html>
-    `;
-    const text = `
-      Substitution Blocks Canceled
-      
-      The following blocks for Request #${requestId} by ${teacherName} have been canceled:
-      
-      Blocks: ${canceledBlocks.join(', ') || '-'}
-      Subject: ${request.subject || '-'}
-      Room: ${request.room || '-'}
-      Date: ${request.day || '-'}
-      Notes: ${request.notes || 'None'}
-      
-      These blocks are now available for other substitutes to accept.
-    `;
+    // === Check open blocks AFTER cancel ===
+    const [afterResults] = await connection.promise().query(
+      'SELECT block FROM request_assignments WHERE request_id = ?',
+      [requestId]
+    );
+    const afterAssigned = afterResults.map(r => r.block);
+    const hasOpenBlocks = requestedBlocks.some(b => !afterAssigned.includes(b));
+    const openBlocks = requestedBlocks.filter(b => !afterAssigned.includes(b));
 
-    // Send emails to teacher and all substitutes
-    try {
-      const recipients = [teacherEmail, ...substituteEmails];
-      await Promise.all(
-        recipients.map(recipient =>
-          transporter.sendMail({
-            from: `"Substitute Scheduler" <${process.env.EMAIL_USER}>`,
-            to: recipient,
-            subject,
-            text,
-            html,
-          })
-        )
-      );
-    } catch (err) {
-      console.error('Error sending emails:', err);
-      return res.status(500).json({ error: `Failed to send emails: ${err.message}` });
+    // === ALWAYS notify teacher ===
+    const teacherHtml = `
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="background:#f4f4f4;margin:0;padding:20px;font-family:Arial,sans-serif;">
+  <table align="center" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px;background:#fff;border-radius:8px;overflow:hidden;">
+    <tr><td style="background:rgb(20,54,100);padding:20px;text-align:center;"></td></tr>
+    <tr><td style="padding:30px;">
+      <h2 style="color:rgb(20,54,100);margin:0 0 20px;font-size:24px;">Blocks Canceled</h2>
+      <p style="color:#333;font-size:16px;line-height:1.5;margin:0 0 20px;">
+        <strong>${subName}</strong> has canceled their assignment for:
+      </p>
+      <p style="background:#ffebee;padding:15px;border-radius:6px;font-weight:bold;color:#c62828;">
+        ${canceledBlocks.join(', ')}
+      </p>
+      <table cellpadding="10" cellspacing="0" width="100%" style="border-collapse:collapse;font-size:16px;color:#333;">
+        <tr><td style="border:1px solid #e0e0e0;padding:10px;"><strong>Subject:</strong></td><td style="border:1px solid #e0e0e0;padding:10px;">${request.subject || '-'}</td></tr>
+        <tr><td style="border:1px solid #e0e0e0;padding:10px;"><strong>Room:</strong></td><td style="border:1px solid #e0e0e0;padding:10px;">${request.room || '-'}</td></tr>
+        <tr><td style="border:1px solid #e0e0e0;padding:10px;"><strong>Date:</strong></td><td style="border:1px solid #e0e0e0;padding:10px;">${request.day || '-'}</td></tr>
+      </table>
+    </td></tr>
+    <tr><td style="background:rgb(30,64,110);color:#fff;padding:15px;text-align:center;font-size:14px;">
+      <p style="margin:0;">Substitute Scheduler | The Episcopal Academy</p>
+      <p style="margin:5px 0;">1785 Bishop White Drive, Newtown Square, PA 19073</p>
+    </td></tr>
+  </table>
+</body></html>`;
+
+    await transporter.sendMail({
+      from: `"Substitute Scheduler" <${process.env.EMAIL_USER}>`,
+      to: teacherEmail,
+      subject: `Blocks Canceled by ${subName} – Request #${requestId}`,
+      html: teacherHtml,
+    });
+
+    // === Notify other subs ONLY if was full → now has openings ===
+    if (wasFullyCovered && hasOpenBlocks) {
+      const subHtml = `
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="background:#f4f4f4;margin:0;padding:20px;font-family:Arial,sans-serif;">
+  <table align="center" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px;background:#fff;border-radius:8px;overflow:hidden;">
+    <tr><td style="background:rgb(20,54,100);padding:20px;text-align:center;"></td></tr>
+    <tr><td style="padding:30px;">
+      <h2 style="color:rgb(20,54,100);margin:0 0 20px;font-size:24px;">Blocks Now Available</h2>
+      <p style="color:#333;font-size:16px;line-height:1.5;margin:0 0 20px;">
+        <strong>${subName}</strong> has canceled. The following blocks are now open:
+      </p>
+      <p style="background:#e8f5e8;padding:15px;border-radius:6px;font-weight:bold;color:#2e7d32;">
+        ${openBlocks.join(', ')}
+      </p>
+      <table cellpadding="10" cellspacing="0" width="100%" style="border-collapse:collapse;font-size:16px;color:#333;">
+        <tr><td style="border:1px solid #e0e0e0;padding:10px;"><strong>Subject:</strong></td><td style="border:1px solid #e0e0e0;padding:10px;">${request.subject || '-'}</td></tr>
+        <tr><td style="border:1px solid #e0e0e0;padding:10px;"><strong>Room:</strong></td><td style="border:1px solid #e0e0e0;padding:10px;">${request.room || '-'}</td></tr>
+        <tr><td style="border:1px solid #e0e0e0;padding:10px;"><strong>Date:</strong></td><td style="border:1px solid #e0e0e0;padding:10px;">${request.day || '-'}</td></tr>
+      </table>
+      <p style="margin-top:20px;">
+        <a href="${process.env.APP_URL}/assign?requestId=${requestId}" 
+           style="background:rgb(20,54,100);color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">
+          Claim These Blocks
+        </a>
+      </p>
+    </td></tr>
+    <tr><td style="background:rgb(30,64,110);color:#fff;padding:15px;text-align:center;font-size:14px;">
+      <p style="margin:0;">Substitute Scheduler | The Episcopal Academy</p>
+      <p style="margin:5px 0;">1785 Bishop White Drive, Newtown Square, PA 19073</p>
+    </td></tr>
+  </table>
+</body></html>`;
+
+      const otherSubEmails = sentEmails.filter(e => e !== email);
+      if (otherSubEmails.length > 0) {
+        await Promise.all(
+          otherSubEmails.map(recipient =>
+            transporter.sendMail({
+              from: `"Substitute Scheduler" <${process.env.EMAIL_USER}>`,
+              to: recipient,
+              subject: `Blocks Available: ${openBlocks.join(', ')} – Request #${requestId}`,
+              html: subHtml,
+            })
+          )
+        );
+      }
     }
 
     res.status(200).json({ message: 'Assignment canceled successfully', added: true });
@@ -1959,7 +1777,9 @@ app.post('/cancel-assignment', async (req, res) => {
 });
 
 
-app.post('/admin-complete-request', async (req, res) => {
+
+
+app.post('/api/admin-complete-request', async (req, res) => {
   const { email, requestId } = req.body;
 
   if (!email || !requestId) {
@@ -1978,7 +1798,7 @@ app.post('/admin-complete-request', async (req, res) => {
 
     // Verify request exists and is not completed
     const [requestResults] = await connection.promise().query(
-      'SELECT id FROM requests WHERE id = ? AND status != ?',
+      'SELECT id FROM Requests WHERE id = ? AND status != ?',
       [requestId, 'completed']
     );
     if (requestResults.length === 0) {
@@ -1987,7 +1807,7 @@ app.post('/admin-complete-request', async (req, res) => {
 
     // Update request status to completed
     await connection.promise().query(
-      'UPDATE requests SET status = ? WHERE id = ?',
+      'UPDATE Requests SET status = ? WHERE id = ?',
       ['completed', requestId]
     );
 
@@ -1998,19 +1818,204 @@ app.post('/admin-complete-request', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
-});
-// CREATE TABLE Users (
-//   id INT NOT NULL AUTO_INCREMENT,
-//   email VARCHAR(255) NOT NULL,
-//   first_name VARCHAR(50),
-//   last_name VARCHAR(50),
-//   role VARCHAR(20),
-//   specialty VARCHAR(100),
-//   phone_number VARCHAR(20),
-//   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-//   PRIMARY KEY (id),
-//   UNIQUE(email)
-// );
 
+
+app.delete('/api/requests/:requestId', async (req, res) => {
+  const { requestId } = req.params;
+  const { email } = req.query;
+
+  if (!email || !requestId)
+    return res.status(400).json({ error: 'Email and requestId are required' });
+
+  try {
+    await transporter.verify();
+
+    // 🔹 Lookup user
+    const [userResults] = await connection
+      .promise()
+      .query('SELECT id, role FROM Users WHERE email = ?', [email]);
+
+    if (!userResults.length)
+      return res.status(404).json({ error: 'User not found' });
+
+    const { id: teacherId, role } = userResults[0];
+    const isAdmin =
+      email.toLowerCase().includes('admin@ea') ||
+      role?.toLowerCase() === 'admin';
+
+    // 🔹 Build query (admins can cancel any request)
+    console.log('isAdmin:', isAdmin, 'requestId:', requestId, 'email:', email);
+    let query = `
+      SELECT r.*, t.first_name AS teacher_first_name, t.last_name AS teacher_last_name
+      FROM Requests r
+      JOIN Users t ON r.teacher_id = t.id
+      WHERE r.id = ? AND r.status != 'completed'
+    `;
+    const params = [requestId];
+
+    if (!isAdmin) {
+      query = query.replace('AND r.status !=', 'AND r.teacher_id = ? AND r.status !=');
+      params.splice(1, 0, teacherId);
+    }
+
+    // 🔹 Fetch request
+    const [requestResults] = await connection.promise().query(query, params);
+    if (!requestResults.length)
+      return res
+        .status(404)
+        .json({ error: 'Request not found or already completed' });
+
+    const request = requestResults[0];
+    const teacherName = `${request.teacher_first_name} ${request.teacher_last_name}`;
+    const sentEmails = request.sent
+      ? [...new Set(request.sent.split(',').map((e) => e.trim()))]
+      : [];
+
+    // 🔹 Get assignments
+    const [assignments] = await connection.promise().query(
+      `SELECT ra.block, u.email, u.first_name, u.last_name
+       FROM request_assignments ra
+       JOIN Users u ON ra.sub_id = u.id
+       WHERE ra.request_id = ?`,
+      [requestId]
+    );
+
+    const assignedEmails = [...new Set(assignments.map((a) => a.email))];
+    const notAssignedEmails = sentEmails.filter(
+      (e) => !assignedEmails.includes(e)
+    );
+
+    // 🔹 Send email to non-assigned substitutes
+    if (notAssignedEmails.length) {
+      const html = `
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="background:#f4f4f4;margin:0;padding:20px;font-family:Arial,sans-serif;">
+  <table align="center" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px;background:#fff;border-radius:8px;overflow:hidden;">
+    <tr><td style="background:rgb(20,54,100);padding:20px;text-align:center;"></td></tr>
+    <tr><td style="padding:30px;">
+      <h2 style="color:rgb(20,54,100);margin:0 0 20px;font-size:24px;">Request Canceled</h2>
+      <p style="color:#333;font-size:16px;line-height:1.5;margin:0 0 20px;">
+        The substitution request by <strong>${teacherName}</strong> has been canceled.
+      </p>
+      <table cellpadding="10" cellspacing="0" width="100%" style="border-collapse:collapse;font-size:16px;color:#333;">
+        <tr><td style="border:1px solid #e0e0e0;"><strong>Subject:</strong></td><td style="border:1px solid #e0e0e0;">${request.subject || '-'}</td></tr>
+        <tr><td style="border:1px solid #e0e0e0;"><strong>Room:</strong></td><td style="border:1px solid #e0e0e0;">${request.room || '-'}</td></tr>
+        <tr><td style="border:1px solid #e0e0e0;"><strong>Date:</strong></td><td style="border:1px solid #e0e0e0;">${request.day || '-'}</td></tr>
+      </table>
+    </td></tr>
+    <tr><td style="background:rgb(30,64,110);color:#fff;padding:15px;text-align:center;font-size:14px;">
+      <p style="margin:0;">Substitute Scheduler | The Episcopal Academy</p>
+      <p style="margin:5px 0;">1785 Bishop White Drive, Newtown Square, PA 19073</p>
+    </td></tr>
+  </table>
+</body></html>`;
+      await Promise.all(
+        notAssignedEmails.map((recipient) =>
+          transporter.sendMail({
+            from: `"Substitute Scheduler" <${process.env.EMAIL_USER}>`,
+            to: recipient,
+            subject: `Request #${requestId} Canceled`,
+            html,
+          })
+        )
+      );
+    }
+
+    // 🔹 Send email to assigned substitutes
+    if (assignments.length) {
+      const grouped = {};
+      assignments.forEach((a) => {
+        if (!grouped[a.email])
+          grouped[a.email] = { name: `${a.first_name} ${a.last_name}`, blocks: [] };
+        grouped[a.email].blocks.push(a.block);
+      });
+
+      await Promise.all(
+        Object.entries(grouped).map(([subEmail, { name, blocks }]) => {
+          const html = `
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="background:#f4f4f4;margin:0;padding:20px;font-family:Arial,sans-serif;">
+  <table align="center" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px;background:#fff;border-radius:8px;overflow:hidden;">
+    <tr><td style="background:rgb(20,54,100);padding:20px;text-align:center;"></td></tr>
+    <tr><td style="padding:30px;">
+      <h2 style="color:rgb(20,54,100);margin:0 0 20px;font-size:24px;">Your Assignment Canceled</h2>
+      <p style="color:#333;font-size:16px;line-height:1.5;margin:0 0 20px;">
+        <strong>${name}</strong>, your assigned blocks for <strong>${teacherName}</strong>'s request have been canceled.
+      </p>
+      <div style="background:#ffebee;padding:15px;border-radius:6px;margin:15px 0;">
+        <p style="margin:0;font-weight:bold;color:#c62828;">
+          CANCELED BLOCKS: ${blocks.join(', ')}
+        </p>
+      </div>
+      <table cellpadding="10" cellspacing="0" width="100%" style="border-collapse:collapse;font-size:16px;color:#333;">
+        <tr><td style="border:1px solid #e0e0e0;"><strong>Subject:</strong></td><td style="border:1px solid #e0e0e0;">${request.subject || '-'}</td></tr>
+        <tr><td style="border:1px solid #e0e0e0;"><strong>Room:</strong></td><td style="border:1px solid #e0e0e0;">${request.room || '-'}</td></tr>
+        <tr><td style="border:1px solid #e0e0e0;"><strong>Date:</strong></td><td style="border:1px solid #e0e0e0;">${request.day || '-'}</td></tr>
+      </table>
+    </td></tr>
+    <tr><td style="background:rgb(30,64,110);color:#fff;padding:15px;text-align:center;font-size:14px;">
+      <p style="margin:0;">Substitute Scheduler | The Episcopal Academy</p>
+      <p style="margin:5px 0;">1785 Bishop White Drive, Newtown Square, PA 19073</p>
+    </td></tr>
+  </table>
+</body></html>`;
+          return transporter.sendMail({
+            from: `"Substitute Scheduler" <${process.env.EMAIL_USER}>`,
+            to: subEmail,
+            subject: `Your Blocks Canceled – Request #${requestId}`,
+            html,
+          });
+        })
+      );
+    }
+
+    // 🔹 Delete request and assignments
+    await connection
+      .promise()
+      .query('DELETE FROM request_assignments WHERE request_id = ?', [
+        requestId,
+      ]);
+    await connection.promise().query('DELETE FROM Requests WHERE id = ?', [
+      requestId,
+    ]);
+
+    res.status(200).json({
+      message: 'Request canceled successfully',
+      deleted: true,
+      canceledBy: isAdmin ? 'admin' : 'teacher',
+    });
+  } catch (err) {
+    console.error('Error canceling request:', err);
+    res.status(500).json({ error: `Failed to cancel request: ${err.message}` });
+  }
+});
+
+
+
+
+// app.use(express.static('public'));
+
+
+const path = require('path');
+
+// Serve React build folder (assuming it's at ../build)
+app.use(express.static(path.join(__dirname, '../build')));
+
+// Optional: log requests for debugging
+app.use((req, res, next) => {
+  console.log(req.method, req.url);
+  next();
+});
+
+// Catch-all route — send React app for non-API routes
+app.get('*', (req, res) => {
+  if (!req.url.startsWith('/api')) {
+    res.sendFile(path.join(__dirname, '../build', 'index.html'));
+  } else {
+    res.status(404).send('API route not found');
+  }
+});
+
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server running at http://31.97.141.212:${port}`);
+});

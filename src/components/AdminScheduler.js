@@ -106,7 +106,7 @@ const AdminScheduler = () => {
 
     const fetchSubs = async () => {
       try {
-        const response = await fetch('http://localhost:3001/get-subs');
+        const response = await fetch('/api/get-subs');
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         const result = await response.json();
         const processedSubs = result.map((sub) => ({
@@ -126,7 +126,7 @@ const AdminScheduler = () => {
 
     const fetchTeachers = async () => {
       try {
-        const response = await fetch('http://localhost:3001/get-teacher-ids');
+        const response = await fetch('/api/get-teacher-ids');
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         const result = await response.json();
         const processedTeachers = result.map((teacher) => ({
@@ -387,7 +387,7 @@ const AdminScheduler = () => {
     const formattedSubject = `${schoolLevel}, ${subject}`;
     const data = {
       teacherEmail: selectedTeacher.email || selfEmail,
-      date,
+      date: date ? new Date(date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' }).replace(/\//g, '-') : '',
       room,
       blocks: blocks.join(', ') || '',
       subject: formattedSubject,
@@ -396,8 +396,9 @@ const AdminScheduler = () => {
       selectedSubs: emailAllSubs ? [] : subjectSpecificEmails,
     };
 
+
     try {
-      const response = await fetch('http://localhost:3001/send-substitute-email', {
+      const response = await fetch('/api/send-substitute-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
