@@ -36,6 +36,11 @@ const AdminEditor = () => {
   const navigate = useNavigate();
   const toast = useToast();
 
+
+  useEffect(() => {
+    document.title = "Admin Table Editor";
+  }, []);
+
   useEffect(() => {
     if (!requestId) {
       toast({

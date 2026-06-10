@@ -97,6 +97,11 @@ const LinkLogin = () => {
   };
 
   useEffect(() => {
+    document.title = "Sign Up";
+  }, []);
+
+
+  useEffect(() => {
     const fetchRequestExists = async (requestIdFromQuery) => {
       try {
         const response = await fetch(`/api/check-request?requestId=${encodeURIComponent(requestIdFromQuery)}`);
